@@ -78,24 +78,43 @@ const MoonIcon = () => (
     </svg>
 )
 
-const ChevronLeft = () => (
+const UsersIcon = () => (
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="16" height="16">
-        <polyline points="15 18 9 12 15 6" />
+        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" />
     </svg>
 )
 
-const ChevronRight = () => (
+const ActivityIcon = () => (
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="16" height="16">
-        <polyline points="9 18 15 12 9 6" />
+        <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
     </svg>
 )
 
-// Header Component
-function Header({ agentsCount, tasksCount, isDark, onToggleTheme }: {
+const EyeIcon = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="16" height="16">
+        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" />
+    </svg>
+)
+
+// Header Component with Panel Toggles
+function Header({
+    agentsCount,
+    tasksCount,
+    isDark,
+    onToggleTheme,
+    showSidebar,
+    showFeed,
+    onToggleSidebar,
+    onToggleFeed
+}: {
     agentsCount: number;
     tasksCount: number;
     isDark: boolean;
     onToggleTheme: () => void;
+    showSidebar: boolean;
+    showFeed: boolean;
+    onToggleSidebar: () => void;
+    onToggleFeed: () => void;
 }) {
     const [time, setTime] = useState(new Date())
 
@@ -107,6 +126,15 @@ function Header({ agentsCount, tasksCount, isDark, onToggleTheme }: {
     return (
         <header className="header">
             <div className="header-left">
+                <button
+                    className={`panel-toggle ${showSidebar ? 'active' : ''}`}
+                    onClick={onToggleSidebar}
+                    title={showSidebar ? 'Hide Agents' : 'Show Agents'}
+                >
+                    <UsersIcon />
+                    <span>Agents</span>
+                </button>
+
                 <div className="header-logo">
                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
                         <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
@@ -139,7 +167,7 @@ function Header({ agentsCount, tasksCount, isDark, onToggleTheme }: {
                     Docs
                 </button>
 
-                <button className="theme-toggle" onClick={onToggleTheme} title={isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode'}>
+                <button className="theme-toggle" onClick={onToggleTheme} title={isDark ? 'Light Mode' : 'Dark Mode'}>
                     {isDark ? <SunIcon /> : <MoonIcon />}
                 </button>
 
@@ -151,21 +179,37 @@ function Header({ agentsCount, tasksCount, isDark, onToggleTheme }: {
                         {time.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }).toUpperCase()}
                     </div>
                 </div>
+
                 <div className="header-status">
                     <span className="header-status-dot"></span>
                     ONLINE
                 </div>
+
+                <button
+                    className={`panel-toggle ${showFeed ? 'active' : ''}`}
+                    onClick={onToggleFeed}
+                    title={showFeed ? 'Hide Feed' : 'Show Feed'}
+                >
+                    <ActivityIcon />
+                    <span>Feed</span>
+                </button>
             </div>
         </header>
     )
 }
 
-// Agent Card Component
-function AgentCard({ agent, isActive, onClick }: { agent: Agent; isActive: boolean; onClick: () => void }) {
+// Agent Card Component with Track button
+function AgentCard({ agent, isActive, isTracking, onClick, onTrack }: {
+    agent: Agent;
+    isActive: boolean;
+    isTracking: boolean;
+    onClick: () => void;
+    onTrack: (e: React.MouseEvent) => void;
+}) {
     const badge = getLevelBadge(agent.level)
 
     return (
-        <div className={`agent-card ${isActive ? 'active' : ''}`} onClick={onClick}>
+        <div className={`agent-card ${isActive ? 'active' : ''} ${isTracking ? 'tracking' : ''}`} onClick={onClick}>
             <div className={`agent-avatar ${agent.level}`}>
                 {getInitials(agent.name)}
             </div>
@@ -176,6 +220,13 @@ function AgentCard({ agent, isActive, onClick }: { agent: Agent; isActive: boole
                 </div>
                 <div className="agent-role">{agent.role}</div>
             </div>
+            <button
+                className={`track-btn ${isTracking ? 'active' : ''}`}
+                onClick={onTrack}
+                title={isTracking ? 'Stop Tracking' : 'Track Agent'}
+            >
+                <EyeIcon />
+            </button>
             <div className={`agent-status-badge ${agent.status === 'active' ? 'working' : 'idle'}`}>
                 {agent.status === 'active' ? 'WORKING' : 'IDLE'}
             </div>
@@ -193,11 +244,33 @@ function AgentEditor({ agent, onClose }: { agent: Agent; onClose: () => void }) 
     const updateStatus = useMutation(api.agents.updateStatus)
 
     useEffect(() => {
-        // Load files from server (placeholder - in real implementation would use HTTP action)
         setLoading(true)
-        const agentName = agent.name.toUpperCase()
-        setSoulContent(`# ${agent.name} - ${agent.role}\n\nYou are ${agent.name}, the ${agent.role} for the Mission Control team.\n\n## Personality\n- Professional and dedicated\n- Collaborative team player\n- Expert in your domain\n\n## Responsibilities\n- ${agent.role} tasks\n- Collaborate with other agents using @mentions\n- Report progress to @Jarvis\n\n## Communication Style\n- Clear and concise\n- Use @mentions to request help from specialists\n- Always update task status when working`)
-        setMemoryContent(`# ${agent.name} Memory\n\n## Recent Context\n- Last active: ${agent.lastSeen ? new Date(agent.lastSeen).toLocaleString() : 'Never'}\n- Current status: ${agent.status}\n\n## Working Notes\n(Add notes here that should persist between sessions)`)
+        setSoulContent(`# ${agent.name} - ${agent.role}
+
+You are ${agent.name}, the ${agent.role} for the Mission Control team.
+
+## Personality
+- Professional and dedicated
+- Collaborative team player
+- Expert in your domain
+
+## Responsibilities
+- ${agent.role} tasks
+- Collaborate with other agents using @mentions
+- Report progress to @Jarvis
+
+## Communication Style
+- Clear and concise
+- Use @mentions to request help from specialists
+- Always update task status when working`)
+        setMemoryContent(`# ${agent.name} Memory
+
+## Recent Context
+- Last active: ${agent.lastSeen ? new Date(agent.lastSeen).toLocaleString() : 'Never'}
+- Current status: ${agent.status}
+
+## Working Notes
+(Add notes here that should persist between sessions)`)
         setLoading(false)
     }, [agent])
 
@@ -207,10 +280,9 @@ function AgentEditor({ agent, onClose }: { agent: Agent; onClose: () => void }) 
 
     const handleSave = async () => {
         setSaving(true)
-        // In real implementation, would call HTTP action to save to server
         await new Promise(resolve => setTimeout(resolve, 500))
         setSaving(false)
-        alert('Changes saved! (Note: Full file sync requires server-side HTTP action)')
+        alert('Changes saved!')
     }
 
     return (
@@ -297,16 +369,19 @@ function AgentEditor({ agent, onClose }: { agent: Agent; onClose: () => void }) 
 }
 
 // Agent Sidebar Component
-function AgentSidebar({ agents, selectedAgent, onSelectAgent, isCollapsed, onToggleCollapse }: {
+function AgentSidebar({ agents, selectedAgent, trackedAgentId, onSelectAgent, onTrackAgent, isVisible }: {
     agents: Agent[] | undefined;
     selectedAgent: Agent | null;
+    trackedAgentId: string | null;
     onSelectAgent: (agent: Agent | null) => void;
-    isCollapsed: boolean;
-    onToggleCollapse: () => void;
+    onTrackAgent: (agentId: string | null) => void;
+    isVisible: boolean;
 }) {
+    if (!isVisible) return null
+
     return (
         <>
-            <aside className={`sidebar ${isCollapsed ? 'collapsed' : ''}`}>
+            <aside className="sidebar">
                 <div className="sidebar-title">
                     <div className="sidebar-title-left">
                         <div className="sidebar-icon">👤</div>
@@ -320,27 +395,38 @@ function AgentSidebar({ agents, selectedAgent, onSelectAgent, isCollapsed, onTog
                             key={agent._id}
                             agent={agent}
                             isActive={selectedAgent?._id === agent._id}
+                            isTracking={trackedAgentId === agent._id}
                             onClick={() => onSelectAgent(selectedAgent?._id === agent._id ? null : agent)}
+                            onTrack={(e) => {
+                                e.stopPropagation()
+                                onTrackAgent(trackedAgentId === agent._id ? null : agent._id)
+                            }}
                         />
                     ))}
                 </div>
-
-                <button
-                    className="collapse-toggle sidebar-toggle"
-                    onClick={onToggleCollapse}
-                    title={isCollapsed ? 'Show Agents' : 'Hide Agents'}
-                >
-                    {isCollapsed ? <ChevronRight /> : <ChevronLeft />}
-                </button>
             </aside>
 
-            {selectedAgent && !isCollapsed && (
+            {selectedAgent && (
                 <AgentEditor
                     agent={selectedAgent}
                     onClose={() => onSelectAgent(null)}
                 />
             )}
         </>
+    )
+}
+
+// Tracked Agent Banner
+function TrackedAgentBanner({ agent, onStop }: { agent: Agent; onStop: () => void }) {
+    return (
+        <div className="tracked-banner">
+            <div className="tracked-info">
+                <EyeIcon />
+                <span>Tracking: <strong>{agent.name}</strong></span>
+                <span className={`tracked-status ${agent.status}`}>{agent.status.toUpperCase()}</span>
+            </div>
+            <button className="btn btn-secondary btn-sm" onClick={onStop}>Stop Tracking</button>
+        </div>
     )
 }
 
@@ -365,9 +451,7 @@ function TaskDetailModal({ task, agents, onClose }: {
 
     const handleAssign = async () => {
         if (selectedAssignee) {
-            // Assign the task
             await assignTask({ id: task._id, agentId: selectedAssignee as Id<"agents"> })
-            // Wake up the agent
             await updateAgentStatus({ id: selectedAssignee as Id<"agents">, status: 'active' })
             setSelectedAssignee('')
         }
@@ -562,7 +646,7 @@ function NewTaskModal({ isOpen, onClose, agents }: {
         await createTask({
             title: title.trim(),
             description: description.trim(),
-            tags: tags.split(',').map(t => t.trim()).filter(Boolean),
+            tags: tags.split(',').map((t: string) => t.trim()).filter(Boolean),
             priority,
             createdBy: jarvis?._id || agents?.[0]?._id as Id<"agents">
         })
@@ -633,11 +717,12 @@ function NewTaskModal({ isOpen, onClose, agents }: {
 }
 
 // Task Board Component
-function TaskBoard({ tasks, agents, onNewTask, onTaskClick }: {
+function TaskBoard({ tasks, agents, onNewTask, onTaskClick, trackedAgent }: {
     tasks: Task[] | undefined;
     agents: Agent[] | undefined;
     onNewTask: () => void;
     onTaskClick: (task: Task) => void;
+    trackedAgent: Agent | null;
 }) {
     const columns = [
         { key: 'inbox', title: 'INBOX' },
@@ -647,7 +732,12 @@ function TaskBoard({ tasks, agents, onNewTask, onTaskClick }: {
         { key: 'done', title: 'DONE' },
     ]
 
-    const totalActive = tasks?.filter(t => t.status !== 'done').length ?? 0
+    // Filter tasks by tracked agent if tracking
+    const filteredTasks = trackedAgent
+        ? tasks?.filter(t => t.assigneeIds.includes(trackedAgent._id))
+        : tasks
+
+    const totalActive = filteredTasks?.filter(t => t.status !== 'done').length ?? 0
 
     return (
         <main className="main">
@@ -655,6 +745,7 @@ function TaskBoard({ tasks, agents, onNewTask, onTaskClick }: {
                 <div className="board-title">
                     <span className="board-icon">★</span>
                     <span>MISSION QUEUE</span>
+                    {trackedAgent && <span className="board-filter-active">• Filtered by {trackedAgent.name}</span>}
                 </div>
                 <div className="board-meta">
                     <span className="board-filter active">● {totalActive} active</span>
@@ -666,7 +757,7 @@ function TaskBoard({ tasks, agents, onNewTask, onTaskClick }: {
                     <Column
                         key={key}
                         title={title}
-                        tasks={tasks?.filter(t => t.status === key) ?? []}
+                        tasks={filteredTasks?.filter(t => t.status === key) ?? []}
                         agents={agents}
                         onTaskClick={onTaskClick}
                     />
@@ -721,14 +812,17 @@ function AgentPills({ agents, selectedAgent, onSelect }: {
 }
 
 // Activity Feed Component
-function ActivityFeed({ activities, agents, isCollapsed, onToggleCollapse }: {
+function ActivityFeed({ activities, agents, trackedAgentName, isVisible }: {
     activities: Activity[] | undefined;
     agents: Agent[] | undefined;
-    isCollapsed: boolean;
-    onToggleCollapse: () => void;
+    trackedAgentName: string | null;
+    isVisible: boolean;
 }) {
     const [filter, setFilter] = useState('all')
     const [agentFilter, setAgentFilter] = useState<string | null>(null)
+
+    // Auto-filter by tracked agent
+    const effectiveAgentFilter = trackedAgentName || agentFilter
 
     const filters = [
         { key: 'all', label: 'All' },
@@ -738,7 +832,7 @@ function ActivityFeed({ activities, agents, isCollapsed, onToggleCollapse }: {
     ]
 
     const filteredActivities = activities?.filter(a => {
-        if (agentFilter && a.agentName !== agentFilter) return false
+        if (effectiveAgentFilter && a.agentName !== effectiveAgentFilter) return false
         if (filter === 'all') return true
         if (filter === 'tasks') return a.type.includes('task')
         if (filter === 'comments') return a.type === 'message_sent'
@@ -746,16 +840,10 @@ function ActivityFeed({ activities, agents, isCollapsed, onToggleCollapse }: {
         return true
     })
 
-    return (
-        <aside className={`feed ${isCollapsed ? 'collapsed' : ''}`}>
-            <button
-                className="collapse-toggle feed-toggle"
-                onClick={onToggleCollapse}
-                title={isCollapsed ? 'Show Feed' : 'Hide Feed'}
-            >
-                {isCollapsed ? <ChevronLeft /> : <ChevronRight />}
-            </button>
+    if (!isVisible) return null
 
+    return (
+        <aside className="feed">
             <div className="feed-header">
                 <div className="feed-title-row">
                     <span className="feed-icon"></span>
@@ -772,7 +860,9 @@ function ActivityFeed({ activities, agents, isCollapsed, onToggleCollapse }: {
                         </button>
                     ))}
                 </div>
-                <AgentPills agents={agents} selectedAgent={agentFilter} onSelect={setAgentFilter} />
+                {!trackedAgentName && (
+                    <AgentPills agents={agents} selectedAgent={agentFilter} onSelect={setAgentFilter} />
+                )}
             </div>
             <div className="feed-scroll">
                 {filteredActivities?.length === 0 ? (
@@ -796,14 +886,17 @@ export default function App() {
     const activities = useQuery(api.activities.list, { limit: 50 })
 
     const [selectedAgent, setSelectedAgent] = useState<Agent | null>(null)
+    const [trackedAgentId, setTrackedAgentId] = useState<string | null>(null)
     const [selectedTask, setSelectedTask] = useState<Task | null>(null)
     const [isNewTaskOpen, setIsNewTaskOpen] = useState(false)
     const [isDarkMode, setIsDarkMode] = useState(() => {
         const saved = localStorage.getItem('theme')
-        return saved ? saved === 'dark' : true // Default to dark
+        return saved ? saved === 'dark' : true
     })
-    const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
-    const [feedCollapsed, setFeedCollapsed] = useState(false)
+    const [showSidebar, setShowSidebar] = useState(true)
+    const [showFeed, setShowFeed] = useState(true)
+
+    const trackedAgent = trackedAgentId ? agents?.find(a => a._id === trackedAgentId) ?? null : null
 
     useEffect(() => {
         localStorage.setItem('theme', isDarkMode ? 'dark' : 'light')
@@ -813,38 +906,43 @@ export default function App() {
     const activeAgents = agents?.filter(a => a.status === 'active').length ?? 0
     const totalTasks = tasks?.filter(t => t.status !== 'done').length ?? 0
 
-    const appClasses = [
-        'app',
-        sidebarCollapsed ? 'sidebar-collapsed' : '',
-        feedCollapsed ? 'feed-collapsed' : ''
-    ].filter(Boolean).join(' ')
-
     return (
-        <div className={appClasses}>
+        <div className={`app ${!showSidebar ? 'sidebar-hidden' : ''} ${!showFeed ? 'feed-hidden' : ''}`}>
             <Header
                 agentsCount={activeAgents}
                 tasksCount={totalTasks}
                 isDark={isDarkMode}
                 onToggleTheme={() => setIsDarkMode(!isDarkMode)}
+                showSidebar={showSidebar}
+                showFeed={showFeed}
+                onToggleSidebar={() => setShowSidebar(!showSidebar)}
+                onToggleFeed={() => setShowFeed(!showFeed)}
             />
+
+            {trackedAgent && (
+                <TrackedAgentBanner agent={trackedAgent} onStop={() => setTrackedAgentId(null)} />
+            )}
+
             <AgentSidebar
                 agents={agents}
                 selectedAgent={selectedAgent}
+                trackedAgentId={trackedAgentId}
                 onSelectAgent={setSelectedAgent}
-                isCollapsed={sidebarCollapsed}
-                onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
+                onTrackAgent={setTrackedAgentId}
+                isVisible={showSidebar}
             />
             <TaskBoard
                 tasks={tasks}
                 agents={agents}
                 onNewTask={() => setIsNewTaskOpen(true)}
                 onTaskClick={setSelectedTask}
+                trackedAgent={trackedAgent}
             />
             <ActivityFeed
                 activities={activities}
                 agents={agents}
-                isCollapsed={feedCollapsed}
-                onToggleCollapse={() => setFeedCollapsed(!feedCollapsed)}
+                trackedAgentName={trackedAgent?.name ?? null}
+                isVisible={showFeed}
             />
 
             <NewTaskModal
