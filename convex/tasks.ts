@@ -151,6 +151,13 @@ export const assign = mutation({
             updatedAt: Date.now(),
         });
 
+        // Wake up the agent - set to active
+        await ctx.db.patch(args.agentId, {
+            status: "active",
+            currentTaskId: args.id,
+            lastSeen: Date.now(),
+        });
+
         // Log activity
         await ctx.db.insert("activities", {
             type: "task_assigned",

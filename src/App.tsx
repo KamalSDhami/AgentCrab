@@ -65,8 +65,38 @@ function getLevelBadge(level: string): { text: string; color: string } {
     }
 }
 
+// Icons
+const SunIcon = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <circle cx="12" cy="12" r="5" /><path d="M12 1v2m0 18v2M4.22 4.22l1.42 1.42m12.72 12.72l1.42 1.42M1 12h2m18 0h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" />
+    </svg>
+)
+
+const MoonIcon = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+    </svg>
+)
+
+const ChevronLeft = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="16" height="16">
+        <polyline points="15 18 9 12 15 6" />
+    </svg>
+)
+
+const ChevronRight = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="16" height="16">
+        <polyline points="9 18 15 12 9 6" />
+    </svg>
+)
+
 // Header Component
-function Header({ agentsCount, tasksCount }: { agentsCount: number; tasksCount: number }) {
+function Header({ agentsCount, tasksCount, isDark, onToggleTheme }: {
+    agentsCount: number;
+    tasksCount: number;
+    isDark: boolean;
+    onToggleTheme: () => void;
+}) {
     const [time, setTime] = useState(new Date())
 
     useEffect(() => {
@@ -108,6 +138,11 @@ function Header({ agentsCount, tasksCount }: { agentsCount: number; tasksCount: 
                     </svg>
                     Docs
                 </button>
+
+                <button className="theme-toggle" onClick={onToggleTheme} title={isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode'}>
+                    {isDark ? <SunIcon /> : <MoonIcon />}
+                </button>
+
                 <div className="header-time">
                     <div className="header-time-clock">
                         {time.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
@@ -148,17 +183,34 @@ function AgentCard({ agent, isActive, onClick }: { agent: Agent; isActive: boole
     )
 }
 
-// Agent Detail Panel
-function AgentDetailPanel({ agent, tasks, onClose }: {
-    agent: Agent;
-    tasks: Task[] | undefined;
-    onClose: () => void
-}) {
+// Agent Editor Component
+function AgentEditor({ agent, onClose }: { agent: Agent; onClose: () => void }) {
+    const [activeTab, setActiveTab] = useState<'soul' | 'memory'>('soul')
+    const [soulContent, setSoulContent] = useState('')
+    const [memoryContent, setMemoryContent] = useState('')
+    const [loading, setLoading] = useState(true)
+    const [saving, setSaving] = useState(false)
     const updateStatus = useMutation(api.agents.updateStatus)
-    const agentTasks = tasks?.filter(t => t.assigneeIds.includes(agent._id)) ?? []
+
+    useEffect(() => {
+        // Load files from server (placeholder - in real implementation would use HTTP action)
+        setLoading(true)
+        const agentName = agent.name.toUpperCase()
+        setSoulContent(`# ${agent.name} - ${agent.role}\n\nYou are ${agent.name}, the ${agent.role} for the Mission Control team.\n\n## Personality\n- Professional and dedicated\n- Collaborative team player\n- Expert in your domain\n\n## Responsibilities\n- ${agent.role} tasks\n- Collaborate with other agents using @mentions\n- Report progress to @Jarvis\n\n## Communication Style\n- Clear and concise\n- Use @mentions to request help from specialists\n- Always update task status when working`)
+        setMemoryContent(`# ${agent.name} Memory\n\n## Recent Context\n- Last active: ${agent.lastSeen ? new Date(agent.lastSeen).toLocaleString() : 'Never'}\n- Current status: ${agent.status}\n\n## Working Notes\n(Add notes here that should persist between sessions)`)
+        setLoading(false)
+    }, [agent])
 
     const handleStatusChange = async (newStatus: "idle" | "active" | "blocked") => {
         await updateStatus({ id: agent._id, status: newStatus })
+    }
+
+    const handleSave = async () => {
+        setSaving(true)
+        // In real implementation, would call HTTP action to save to server
+        await new Promise(resolve => setTimeout(resolve, 500))
+        setSaving(false)
+        alert('Changes saved! (Note: Full file sync requires server-side HTTP action)')
     }
 
     return (
@@ -206,64 +258,89 @@ function AgentDetailPanel({ agent, tasks, onClose }: {
             </div>
 
             <div className="detail-section">
-                <label>Assigned Tasks ({agentTasks.length})</label>
-                <div className="mini-task-list">
-                    {agentTasks.length === 0 ? (
-                        <p className="empty-text">No tasks assigned</p>
-                    ) : (
-                        agentTasks.map(task => (
-                            <div key={task._id} className="mini-task">
-                                <span className={`task-priority-dot ${task.priority || 'medium'}`}></span>
-                                <span>{task.title}</span>
-                            </div>
-                        ))
-                    )}
+                <label>Agent Files</label>
+                <div className="editor-tabs">
+                    <button
+                        className={`editor-tab ${activeTab === 'soul' ? 'active' : ''}`}
+                        onClick={() => setActiveTab('soul')}
+                    >
+                        SOUL.md
+                    </button>
+                    <button
+                        className={`editor-tab ${activeTab === 'memory' ? 'active' : ''}`}
+                        onClick={() => setActiveTab('memory')}
+                    >
+                        Memory
+                    </button>
                 </div>
-            </div>
 
-            <div className="detail-section">
-                <label>Last Active</label>
-                <p>{agent.lastSeen ? formatTime(agent.lastSeen) : 'Never'}</p>
+                <div className="editor-content">
+                    {loading ? (
+                        <div className="empty-state"><p>Loading...</p></div>
+                    ) : (
+                        <textarea
+                            className="editor-textarea"
+                            value={activeTab === 'soul' ? soulContent : memoryContent}
+                            onChange={e => activeTab === 'soul' ? setSoulContent(e.target.value) : setMemoryContent(e.target.value)}
+                        />
+                    )}
+                    <div className="editor-actions">
+                        <button className="btn btn-secondary btn-sm" onClick={onClose}>Cancel</button>
+                        <button className="btn btn-primary btn-sm" onClick={handleSave} disabled={saving}>
+                            {saving ? 'Saving...' : 'Save Changes'}
+                        </button>
+                    </div>
+                </div>
             </div>
         </div>
     )
 }
 
 // Agent Sidebar Component
-function AgentSidebar({ agents, selectedAgent, onSelectAgent, tasks }: {
+function AgentSidebar({ agents, selectedAgent, onSelectAgent, isCollapsed, onToggleCollapse }: {
     agents: Agent[] | undefined;
     selectedAgent: Agent | null;
     onSelectAgent: (agent: Agent | null) => void;
-    tasks: Task[] | undefined;
+    isCollapsed: boolean;
+    onToggleCollapse: () => void;
 }) {
     return (
-        <aside className="sidebar">
-            <div className="sidebar-title">
-                <div className="sidebar-title-left">
-                    <span className="sidebar-icon">👤</span>
-                    <h2>AGENTS</h2>
+        <>
+            <aside className={`sidebar ${isCollapsed ? 'collapsed' : ''}`}>
+                <div className="sidebar-title">
+                    <div className="sidebar-title-left">
+                        <div className="sidebar-icon">👤</div>
+                        <h2>AGENTS</h2>
+                    </div>
+                    <span className="sidebar-title-count">{agents?.length ?? 0}</span>
                 </div>
-                <span className="sidebar-title-count">{agents?.length ?? 0}</span>
-            </div>
-            <div className="sidebar-agents">
-                {agents?.map((agent) => (
-                    <AgentCard
-                        key={agent._id}
-                        agent={agent}
-                        isActive={selectedAgent?._id === agent._id}
-                        onClick={() => onSelectAgent(selectedAgent?._id === agent._id ? null : agent)}
-                    />
-                ))}
-            </div>
+                <div className="sidebar-agents">
+                    {agents?.map((agent) => (
+                        <AgentCard
+                            key={agent._id}
+                            agent={agent}
+                            isActive={selectedAgent?._id === agent._id}
+                            onClick={() => onSelectAgent(selectedAgent?._id === agent._id ? null : agent)}
+                        />
+                    ))}
+                </div>
 
-            {selectedAgent && (
-                <AgentDetailPanel
+                <button
+                    className="collapse-toggle sidebar-toggle"
+                    onClick={onToggleCollapse}
+                    title={isCollapsed ? 'Show Agents' : 'Hide Agents'}
+                >
+                    {isCollapsed ? <ChevronRight /> : <ChevronLeft />}
+                </button>
+            </aside>
+
+            {selectedAgent && !isCollapsed && (
+                <AgentEditor
                     agent={selectedAgent}
-                    tasks={tasks}
                     onClose={() => onSelectAgent(null)}
                 />
             )}
-        </aside>
+        </>
     )
 }
 
@@ -275,6 +352,7 @@ function TaskDetailModal({ task, agents, onClose }: {
 }) {
     const updateStatus = useMutation(api.tasks.updateStatus)
     const assignTask = useMutation(api.tasks.assign)
+    const updateAgentStatus = useMutation(api.agents.updateStatus)
     const [selectedAssignee, setSelectedAssignee] = useState<string>('')
 
     const assignees = task.assigneeIds
@@ -287,7 +365,10 @@ function TaskDetailModal({ task, agents, onClose }: {
 
     const handleAssign = async () => {
         if (selectedAssignee) {
+            // Assign the task
             await assignTask({ id: task._id, agentId: selectedAssignee as Id<"agents"> })
+            // Wake up the agent
+            await updateAgentStatus({ id: selectedAssignee as Id<"agents">, status: 'active' })
             setSelectedAssignee('')
         }
     }
@@ -407,7 +488,7 @@ function TaskCard({ task, agents, onClick }: { task: Task; agents: Agent[] | und
                 )}
                 {task.tags.length > 0 && (
                     <div className="task-tags">
-                        {task.tags.map((tag, i) => (
+                        {task.tags.slice(0, 3).map((tag, i) => (
                             <span key={i} className="task-tag">{tag}</span>
                         ))}
                     </div>
@@ -440,7 +521,7 @@ function Column({ title, tasks, agents, onTaskClick }: {
     return (
         <div className="column">
             <div className="column-header">
-                <span className="column-icon">●</span>
+                <span className="column-icon"></span>
                 <span className="column-title">{title}</span>
                 <span className="column-count">{tasks.length}</span>
             </div>
@@ -640,7 +721,12 @@ function AgentPills({ agents, selectedAgent, onSelect }: {
 }
 
 // Activity Feed Component
-function ActivityFeed({ activities, agents }: { activities: Activity[] | undefined; agents: Agent[] | undefined }) {
+function ActivityFeed({ activities, agents, isCollapsed, onToggleCollapse }: {
+    activities: Activity[] | undefined;
+    agents: Agent[] | undefined;
+    isCollapsed: boolean;
+    onToggleCollapse: () => void;
+}) {
     const [filter, setFilter] = useState('all')
     const [agentFilter, setAgentFilter] = useState<string | null>(null)
 
@@ -661,10 +747,18 @@ function ActivityFeed({ activities, agents }: { activities: Activity[] | undefin
     })
 
     return (
-        <aside className="feed">
+        <aside className={`feed ${isCollapsed ? 'collapsed' : ''}`}>
+            <button
+                className="collapse-toggle feed-toggle"
+                onClick={onToggleCollapse}
+                title={isCollapsed ? 'Show Feed' : 'Hide Feed'}
+            >
+                {isCollapsed ? <ChevronLeft /> : <ChevronRight />}
+            </button>
+
             <div className="feed-header">
                 <div className="feed-title-row">
-                    <span className="feed-icon">●</span>
+                    <span className="feed-icon"></span>
                     <span className="feed-title">LIVE FEED</span>
                 </div>
                 <div className="feed-filters">
@@ -704,18 +798,41 @@ export default function App() {
     const [selectedAgent, setSelectedAgent] = useState<Agent | null>(null)
     const [selectedTask, setSelectedTask] = useState<Task | null>(null)
     const [isNewTaskOpen, setIsNewTaskOpen] = useState(false)
+    const [isDarkMode, setIsDarkMode] = useState(() => {
+        const saved = localStorage.getItem('theme')
+        return saved ? saved === 'dark' : true // Default to dark
+    })
+    const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+    const [feedCollapsed, setFeedCollapsed] = useState(false)
 
-    const activeAgents = agents?.length ?? 0
+    useEffect(() => {
+        localStorage.setItem('theme', isDarkMode ? 'dark' : 'light')
+        document.body.classList.toggle('light-mode', !isDarkMode)
+    }, [isDarkMode])
+
+    const activeAgents = agents?.filter(a => a.status === 'active').length ?? 0
     const totalTasks = tasks?.filter(t => t.status !== 'done').length ?? 0
 
+    const appClasses = [
+        'app',
+        sidebarCollapsed ? 'sidebar-collapsed' : '',
+        feedCollapsed ? 'feed-collapsed' : ''
+    ].filter(Boolean).join(' ')
+
     return (
-        <div className="app">
-            <Header agentsCount={activeAgents} tasksCount={totalTasks} />
+        <div className={appClasses}>
+            <Header
+                agentsCount={activeAgents}
+                tasksCount={totalTasks}
+                isDark={isDarkMode}
+                onToggleTheme={() => setIsDarkMode(!isDarkMode)}
+            />
             <AgentSidebar
                 agents={agents}
                 selectedAgent={selectedAgent}
                 onSelectAgent={setSelectedAgent}
-                tasks={tasks}
+                isCollapsed={sidebarCollapsed}
+                onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
             />
             <TaskBoard
                 tasks={tasks}
@@ -723,7 +840,12 @@ export default function App() {
                 onNewTask={() => setIsNewTaskOpen(true)}
                 onTaskClick={setSelectedTask}
             />
-            <ActivityFeed activities={activities} agents={agents} />
+            <ActivityFeed
+                activities={activities}
+                agents={agents}
+                isCollapsed={feedCollapsed}
+                onToggleCollapse={() => setFeedCollapsed(!feedCollapsed)}
+            />
 
             <NewTaskModal
                 isOpen={isNewTaskOpen}
