@@ -34,3 +34,4 @@ openclaw.json
 
 # Build artifacts
 *.tsbuildinfo
+target.md

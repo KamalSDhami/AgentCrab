@@ -959,7 +959,8 @@ export default function App() {
                 const convexUrl = import.meta.env.VITE_CONVEX_URL
                 const response = await fetch(`${convexUrl}/api/init`, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' }
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ seedTasks: false })
                 })
                 const result = await response.json()
                 if (result.status === 'ok') {

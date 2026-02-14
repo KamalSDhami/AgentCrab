@@ -319,12 +319,22 @@ http.route({
 
 // ─── Initialize Database Endpoint ───────────────────────────────────
 // POST /api/init
-// Initializes the database with seed data (agents and tasks)
+// Initializes the database with seed data.
+// Default: seeds agents only (no sample tasks).
+// Optional body: { "seedTasks": true }
 http.route({
     path: "/api/init",
     method: "POST",
     handler: httpAction(async (ctx) => {
         try {
+            let seedTasks = false;
+            try {
+                const body = await ctx.request.json();
+                seedTasks = Boolean(body?.seedTasks);
+            } catch {
+                // No JSON body provided.
+            }
+
             // Check if already seeded
             const existingAgents = await ctx.runQuery(api.agents.list);
             if (existingAgents && existingAgents.length > 0) {
@@ -332,6 +342,7 @@ http.route({
                     JSON.stringify({ 
                         message: "Database already initialized", 
                         agentsCount: existingAgents.length,
+                        seedTasks,
                         status: "ok"
                     }),
                     { status: 200, headers: { "Content-Type": "application/json" } }
@@ -340,9 +351,11 @@ http.route({
 
             // Seed agents
             const agentResult = await ctx.runMutation(api.seed.seedAgents);
-            
-            // Seed tasks
-            const taskResult = await ctx.runMutation(api.seed.seedTasks);
+
+            let taskResult: unknown = { message: "Sample tasks not seeded", count: 0 };
+            if (seedTasks) {
+                taskResult = await ctx.runMutation(api.seed.seedTasks);
+            }
 
             return new Response(
                 JSON.stringify({ 
