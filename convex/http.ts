@@ -317,4 +317,68 @@ http.route({
     }),
 });
 
+// ─── Initialize Database Endpoint ───────────────────────────────────
+// POST /api/init
+// Initializes the database with seed data (agents and tasks)
+http.route({
+    path: "/api/init",
+    method: "POST",
+    handler: httpAction(async (ctx) => {
+        try {
+            // Check if already seeded
+            const existingAgents = await ctx.runQuery(api.agents.list);
+            if (existingAgents && existingAgents.length > 0) {
+                return new Response(
+                    JSON.stringify({ 
+                        message: "Database already initialized", 
+                        agentsCount: existingAgents.length,
+                        status: "ok"
+                    }),
+                    { status: 200, headers: { "Content-Type": "application/json" } }
+                );
+            }
+
+            // Seed agents
+            const agentResult = await ctx.runMutation(api.seed.seedAgents);
+            
+            // Seed tasks
+            const taskResult = await ctx.runMutation(api.seed.seedTasks);
+
+            return new Response(
+                JSON.stringify({ 
+                    status: "ok",
+                    message: "Database initialized successfully",
+                    agents: agentResult,
+                    tasks: taskResult
+                }),
+                { status: 200, headers: { "Content-Type": "application/json" } }
+            );
+        } catch (error) {
+            console.error("Init error:", error);
+            return new Response(
+                JSON.stringify({ 
+                    error: "Initialization failed",
+                    details: error instanceof Error ? error.message : "Unknown error"
+                }),
+                { status: 500, headers: { "Content-Type": "application/json" } }
+            );
+        }
+    }),
+});
+
+http.route({
+    path: "/api/init",
+    method: "OPTIONS",
+    handler: httpAction(async () => {
+        return new Response(null, {
+            status: 204,
+            headers: {
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Methods": "POST, OPTIONS",
+                "Access-Control-Allow-Headers": "Content-Type, Authorization",
+            },
+        });
+    }),
+});
+
 export default http;

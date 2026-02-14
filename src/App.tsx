@@ -950,6 +950,31 @@ export default function App() {
     })
     const [showSidebar, setShowSidebar] = useState(true)
     const [showFeed, setShowFeed] = useState(true)
+    const [isInitialized, setIsInitialized] = useState(false)
+
+    // Initialize database on first load
+    useEffect(() => {
+        const initDatabase = async () => {
+            try {
+                const convexUrl = import.meta.env.VITE_CONVEX_URL
+                const response = await fetch(`${convexUrl}/api/init`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                })
+                const result = await response.json()
+                if (result.status === 'ok') {
+                    setIsInitialized(true)
+                }
+            } catch (error) {
+                console.error('Failed to initialize database:', error)
+                setIsInitialized(true) // Continue anyway
+            }
+        }
+
+        if (!isInitialized && agents === undefined) {
+            initDatabase()
+        }
+    }, [agents, isInitialized])
 
     const trackedAgent = trackedAgentId ? agents?.find(a => a._id === trackedAgentId) ?? null : null
 
