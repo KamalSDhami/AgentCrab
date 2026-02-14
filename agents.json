@@ -1,0 +1,55 @@
+{
+    "agents": [
+        {
+            "id": "jarvis",
+            "name": "Jarvis",
+            "soul": "JARVIS",
+            "default": true
+        },
+        {
+            "id": "shuri",
+            "name": "Shuri",
+            "soul": "SHURI"
+        },
+        {
+            "id": "fury",
+            "name": "Fury",
+            "soul": "FURY"
+        },
+        {
+            "id": "vision",
+            "name": "Vision",
+            "soul": "VISION"
+        },
+        {
+            "id": "loki",
+            "name": "Loki",
+            "soul": "LOKI"
+        },
+        {
+            "id": "quill",
+            "name": "Quill",
+            "soul": "QUILL"
+        },
+        {
+            "id": "wanda",
+            "name": "Wanda",
+            "soul": "WANDA"
+        },
+        {
+            "id": "pepper",
+            "name": "Pepper",
+            "soul": "PEPPER"
+        },
+        {
+            "id": "friday",
+            "name": "Friday",
+            "soul": "FRIDAY"
+        },
+        {
+            "id": "wong",
+            "name": "Wong",
+            "soul": "WONG"
+        }
+    ]
+}

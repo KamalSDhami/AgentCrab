@@ -2,17 +2,61 @@ import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
 
 export default defineSchema({
-    // Agent profiles and status
+    // Gateway connections (tracks OpenClaw gateway endpoints)
+    gateways: defineTable({
+        name: v.string(),
+        url: v.string(),
+        token: v.optional(v.string()),
+        workspaceRoot: v.optional(v.string()),
+        status: v.union(v.literal("connected"), v.literal("disconnected"), v.literal("error")),
+        lastPingAt: v.optional(v.number()),
+        createdAt: v.number(),
+        updatedAt: v.number(),
+    }).index("by_url", ["url"]),
+
+    // Agent profiles, status, and gateway binding
     agents: defineTable({
         name: v.string(),
         role: v.string(),
-        status: v.union(v.literal("idle"), v.literal("active"), v.literal("blocked")),
+        status: v.union(
+            v.literal("idle"),
+            v.literal("active"),
+            v.literal("blocked"),
+            v.literal("provisioning"),
+            v.literal("offline")
+        ),
         currentTaskId: v.optional(v.id("tasks")),
         sessionKey: v.string(),
         level: v.union(v.literal("intern"), v.literal("specialist"), v.literal("lead")),
         avatar: v.optional(v.string()),
         lastSeen: v.optional(v.number()),
-    }).index("by_session", ["sessionKey"]),
+        // Gateway integration fields (ported from reference)
+        openclawSessionId: v.optional(v.string()),
+        gatewayId: v.optional(v.id("gateways")),
+        isBoardLead: v.optional(v.boolean()),
+        // Agent persona & configuration
+        soulTemplate: v.optional(v.string()),
+        identityProfile: v.optional(v.object({
+            emoji: v.optional(v.string()),
+            theme: v.optional(v.string()),
+            description: v.optional(v.string()),
+        })),
+        // Heartbeat configuration
+        heartbeatConfig: v.optional(v.object({
+            intervalMinutes: v.optional(v.number()),
+            cronExpression: v.optional(v.string()),
+            message: v.optional(v.string()),
+        })),
+        // Provisioning state
+        provisionStatus: v.optional(v.union(
+            v.literal("pending"),
+            v.literal("confirmed"),
+            v.literal("failed")
+        )),
+        provisionedAt: v.optional(v.number()),
+    }).index("by_session", ["sessionKey"])
+        .index("by_openclaw_session", ["openclawSessionId"])
+        .index("by_gateway", ["gatewayId"]),
 
     // Task tracking
     tasks: defineTable({

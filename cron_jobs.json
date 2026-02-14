@@ -1,0 +1,237 @@
+{
+    "version": 1,
+    "jobs": [
+        {
+            "id": "jarvis-heartbeat",
+            "name": "jarvis-heartbeat",
+            "enabled": true,
+            "schedule": {
+                "kind": "cron",
+                "expr": "0,15,30,45 * * * *"
+            },
+            "sessionTarget": "main",
+            "agentId": "jarvis",
+            "wakeMode": "next-heartbeat",
+            "payload": {
+                "kind": "agentTurn",
+                "message": "Heartbeat. Read WORKING.md. Resume task or report HEARTBEAT_OK."
+            },
+            "delivery": {
+                "mode": "announce",
+                "channel": "last"
+            },
+            "state": {}
+        },
+        {
+            "id": "shuri-heartbeat",
+            "name": "shuri-heartbeat",
+            "enabled": true,
+            "schedule": {
+                "kind": "cron",
+                "expr": "2,17,32,47 * * * *"
+            },
+            "sessionTarget": "main",
+            "agentId": "shuri",
+            "wakeMode": "next-heartbeat",
+            "payload": {
+                "kind": "agentTurn",
+                "message": "Heartbeat. Read WORKING.md. Resume task or report HEARTBEAT_OK."
+            },
+            "delivery": {
+                "mode": "announce",
+                "channel": "last"
+            },
+            "state": {}
+        },
+        {
+            "id": "fury-heartbeat",
+            "name": "fury-heartbeat",
+            "enabled": true,
+            "schedule": {
+                "kind": "cron",
+                "expr": "4,19,34,49 * * * *"
+            },
+            "sessionTarget": "main",
+            "agentId": "fury",
+            "wakeMode": "next-heartbeat",
+            "payload": {
+                "kind": "agentTurn",
+                "message": "Heartbeat. Read WORKING.md. Resume task or report HEARTBEAT_OK."
+            },
+            "delivery": {
+                "mode": "announce",
+                "channel": "last"
+            },
+            "state": {}
+        },
+        {
+            "id": "vision-heartbeat",
+            "name": "vision-heartbeat",
+            "enabled": true,
+            "schedule": {
+                "kind": "cron",
+                "expr": "6,21,36,51 * * * *"
+            },
+            "sessionTarget": "main",
+            "agentId": "vision",
+            "wakeMode": "next-heartbeat",
+            "payload": {
+                "kind": "agentTurn",
+                "message": "Heartbeat. Read WORKING.md. Resume task or report HEARTBEAT_OK."
+            },
+            "delivery": {
+                "mode": "announce",
+                "channel": "last"
+            },
+            "state": {}
+        },
+        {
+            "id": "loki-heartbeat",
+            "name": "loki-heartbeat",
+            "enabled": true,
+            "schedule": {
+                "kind": "cron",
+                "expr": "8,23,38,53 * * * *"
+            },
+            "sessionTarget": "main",
+            "agentId": "loki",
+            "wakeMode": "next-heartbeat",
+            "payload": {
+                "kind": "agentTurn",
+                "message": "Heartbeat. Read WORKING.md. Resume task or report HEARTBEAT_OK."
+            },
+            "delivery": {
+                "mode": "announce",
+                "channel": "last"
+            },
+            "state": {}
+        },
+        {
+            "id": "quill-heartbeat",
+            "name": "quill-heartbeat",
+            "enabled": true,
+            "schedule": {
+                "kind": "cron",
+                "expr": "10,25,40,55 * * * *"
+            },
+            "sessionTarget": "main",
+            "agentId": "quill",
+            "wakeMode": "next-heartbeat",
+            "payload": {
+                "kind": "agentTurn",
+                "message": "Heartbeat. Read WORKING.md. Resume task or report HEARTBEAT_OK."
+            },
+            "delivery": {
+                "mode": "announce",
+                "channel": "last"
+            },
+            "state": {}
+        },
+        {
+            "id": "wanda-heartbeat",
+            "name": "wanda-heartbeat",
+            "enabled": true,
+            "schedule": {
+                "kind": "cron",
+                "expr": "12,27,42,57 * * * *"
+            },
+            "sessionTarget": "main",
+            "agentId": "wanda",
+            "wakeMode": "next-heartbeat",
+            "payload": {
+                "kind": "agentTurn",
+                "message": "Heartbeat. Read WORKING.md. Resume task or report HEARTBEAT_OK."
+            },
+            "delivery": {
+                "mode": "announce",
+                "channel": "last"
+            },
+            "state": {}
+        },
+        {
+            "id": "pepper-heartbeat",
+            "name": "pepper-heartbeat",
+            "enabled": true,
+            "schedule": {
+                "kind": "cron",
+                "expr": "3,18,33,48 * * * *"
+            },
+            "sessionTarget": "main",
+            "agentId": "pepper",
+            "wakeMode": "next-heartbeat",
+            "payload": {
+                "kind": "agentTurn",
+                "message": "Heartbeat. Read WORKING.md. Resume task or report HEARTBEAT_OK."
+            },
+            "delivery": {
+                "mode": "announce",
+                "channel": "last"
+            },
+            "state": {}
+        },
+        {
+            "id": "friday-heartbeat",
+            "name": "friday-heartbeat",
+            "enabled": true,
+            "schedule": {
+                "kind": "cron",
+                "expr": "5,20,35,50 * * * *"
+            },
+            "sessionTarget": "main",
+            "agentId": "friday",
+            "wakeMode": "next-heartbeat",
+            "payload": {
+                "kind": "agentTurn",
+                "message": "Heartbeat. Read WORKING.md. Resume task or report HEARTBEAT_OK."
+            },
+            "delivery": {
+                "mode": "announce",
+                "channel": "last"
+            },
+            "state": {}
+        },
+        {
+            "id": "wong-heartbeat",
+            "name": "wong-heartbeat",
+            "enabled": true,
+            "schedule": {
+                "kind": "cron",
+                "expr": "14,29,44,59 * * * *"
+            },
+            "sessionTarget": "main",
+            "agentId": "wong",
+            "wakeMode": "next-heartbeat",
+            "payload": {
+                "kind": "agentTurn",
+                "message": "Heartbeat. Read WORKING.md. Resume task or report HEARTBEAT_OK."
+            },
+            "delivery": {
+                "mode": "announce",
+                "channel": "last"
+            },
+            "state": {}
+        },
+        {
+            "id": "daily-standup",
+            "name": "daily-standup",
+            "enabled": true,
+            "schedule": {
+                "kind": "cron",
+                "expr": "0 18 * * *",
+                "tz": "Asia/Kolkata"
+            },
+            "sessionTarget": "main",
+            "agentId": "jarvis",
+            "wakeMode": "next-heartbeat",
+            "payload": {
+                "kind": "agentTurn",
+                "message": "Generate daily standup report. Summarize what each agent accomplished today, what is in progress, what is blocked, and what needs review. Format as a clean summary and deliver to Telegram."
+            },
+            "delivery": {
+                "mode": "announce",
+                "channel": "last"
+            },
+            "state": {}
+        }
+    ]
+}

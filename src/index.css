@@ -1568,6 +1568,122 @@ body {
   border-top: 1px solid var(--border-light);
 }
 
+/* Agent Manager - Online/Offline Indicator */
+.agent-avatar {
+  position: relative;
+}
+
+.online-dot {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 2px solid var(--bg-card-solid);
+}
+
+.online-dot.online {
+  background: var(--accent-green);
+  box-shadow: 0 0 6px var(--accent-green);
+  animation: pulse-dot 2s ease-in-out infinite;
+}
+
+.online-dot.offline {
+  background: var(--text-muted);
+}
+
+@keyframes pulse-dot {
+
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.5;
+  }
+}
+
+/* Agent Session ID in Card */
+.agent-session-id {
+  font-size: 10px;
+  color: var(--text-muted);
+  font-family: 'Monaco', 'Menlo', monospace;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 150px;
+  margin-top: 2px;
+}
+
+/* Agent Status Badge Variants */
+.agent-status-badge.provisioning {
+  background: var(--accent-orange-light);
+  color: var(--accent-orange);
+}
+
+.agent-status-badge.offline {
+  background: rgba(107, 114, 128, 0.2);
+  color: var(--text-muted);
+}
+
+/* Gateway Info Section in Editor */
+.gateway-info {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  background: var(--bg-glass);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-light);
+}
+
+.gateway-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.gateway-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  min-width: 70px;
+}
+
+/* Provision Status Badge */
+.provision-badge {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+.provision-badge.confirmed {
+  background: var(--accent-green-light);
+  color: var(--accent-green);
+}
+
+.provision-badge.pending {
+  background: var(--accent-orange-light);
+  color: var(--accent-orange);
+}
+
+.provision-badge.failed {
+  background: var(--accent-pink-light);
+  color: var(--accent-pink);
+}
+
+/* Config View in Editor */
+.config-view pre {
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+
 /* Scrollbar */
 ::-webkit-scrollbar {
   width: 6px;

@@ -1,0 +1,15 @@
+{
+    "agentId": "friday",
+    "model": "openrouter/gpt-4o-mini",
+    "tools": [
+        "browser",
+        "web_fetch",
+        "exec",
+        "file_read",
+        "file_write"
+    ],
+    "memory": {
+        "enabled": true,
+        "path": "memory"
+    }
+}

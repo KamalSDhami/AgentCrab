@@ -1,0 +1,87 @@
+{
+    "messages": {
+        "ackReactionScope": "group-mentions"
+    },
+    "agents": {
+        "allowedSpawnAgents": [
+            "jarvis",
+            "shuri",
+            "fury",
+            "vision",
+            "loki",
+            "quill",
+            "wanda",
+            "pepper",
+            "friday",
+            "wong"
+        ],
+        "defaults": {
+            "maxConcurrent": 4,
+            "subagents": {
+                "maxConcurrent": 8
+            },
+            "compaction": {
+                "mode": "safeguard"
+            },
+            "workspace": "/root/.openclaw/workspace",
+            "models": {
+                "openrouter/auto": {
+                    "alias": "OpenRouter"
+                },
+                "openrouter/openai/gpt-5.1-codex-mini": {}
+            },
+            "model": {
+                "primary": "openrouter/openai/gpt-5.1-codex-mini"
+            }
+        }
+    },
+    "gateway": {
+        "mode": "local",
+        "auth": {
+            "mode": "token",
+            "token": "a5f40894a60c72afda9beeafb9b3b91d2a7679485ac8cb4a"
+        },
+        "port": 18789,
+        "bind": "loopback",
+        "tailscale": {
+            "mode": "off",
+            "resetOnExit": false
+        }
+    },
+    "auth": {
+        "profiles": {
+            "openrouter:default": {
+                "provider": "openrouter",
+                "mode": "api_key"
+            }
+        }
+    },
+    "plugins": {
+        "entries": {
+            "telegram": {
+                "enabled": true
+            }
+        }
+    },
+    "channels": {
+        "telegram": {
+            "enabled": true,
+            "botToken": "8437598405:AAE5e_WMQzeYcFTgS8RXAuuIRM6yH7Miunw"
+        }
+    },
+    "skills": {
+        "install": {
+            "nodeManager": "npm"
+        }
+    },
+    "wizard": {
+        "lastRunAt": "2026-02-08T17:17:59.536Z",
+        "lastRunVersion": "2026.2.6-3",
+        "lastRunCommand": "onboard",
+        "lastRunMode": "local"
+    },
+    "meta": {
+        "lastTouchedVersion": "2026.2.6-3",
+        "lastTouchedAt": "2026-02-08T17:17:59.547Z"
+    }
+}

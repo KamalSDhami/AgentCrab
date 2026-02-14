@@ -1,0 +1,14 @@
+{
+    "agentId": "quill",
+    "model": "openrouter/gpt-4o-mini",
+    "tools": [
+        "browser",
+        "web_fetch",
+        "file_read",
+        "file_write"
+    ],
+    "memory": {
+        "enabled": true,
+        "path": "memory"
+    }
+}

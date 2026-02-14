@@ -8,10 +8,27 @@ interface Agent {
     _id: Id<"agents">
     name: string
     role: string
-    status: "idle" | "active" | "blocked"
+    status: "idle" | "active" | "blocked" | "provisioning" | "offline"
     level: "intern" | "specialist" | "lead"
     sessionKey: string
     lastSeen?: number
+    // Gateway integration fields
+    openclawSessionId?: string
+    gatewayId?: Id<"gateways">
+    isBoardLead?: boolean
+    soulTemplate?: string
+    identityProfile?: {
+        emoji?: string
+        theme?: string
+        description?: string
+    }
+    heartbeatConfig?: {
+        intervalMinutes?: number
+        cronExpression?: string
+        message?: string
+    }
+    provisionStatus?: "pending" | "confirmed" | "failed"
+    provisionedAt?: number
 }
 
 interface Task {
@@ -207,18 +224,27 @@ function AgentCard({ agent, isActive, isTracking, onClick, onTrack }: {
     onTrack: (e: React.MouseEvent) => void;
 }) {
     const badge = getLevelBadge(agent.level)
+    const isOnline = agent.lastSeen ? (Date.now() - agent.lastSeen) < 300000 : false // 5 min threshold
+    const emoji = agent.identityProfile?.emoji
 
     return (
         <div className={`agent-card ${isActive ? 'active' : ''} ${isTracking ? 'tracking' : ''}`} onClick={onClick}>
             <div className={`agent-avatar ${agent.level}`}>
-                {getInitials(agent.name)}
+                {emoji || getInitials(agent.name)}
+                <span className={`online-dot ${isOnline ? 'online' : 'offline'}`} title={isOnline ? 'Online' : 'Offline'} />
             </div>
             <div className="agent-info">
                 <div className="agent-name-row">
                     <span className="agent-name">{agent.name}</span>
                     <span className={`agent-badge ${badge.color}`}>{badge.text}</span>
+                    {agent.isBoardLead && <span className="agent-badge lead">★ LEAD</span>}
                 </div>
                 <div className="agent-role">{agent.role}</div>
+                {agent.openclawSessionId && (
+                    <div className="agent-session-id" title={agent.openclawSessionId}>
+                        🔗 {agent.openclawSessionId}
+                    </div>
+                )}
             </div>
             <button
                 className={`track-btn ${isTracking ? 'active' : ''}`}
@@ -227,8 +253,8 @@ function AgentCard({ agent, isActive, isTracking, onClick, onTrack }: {
             >
                 <EyeIcon />
             </button>
-            <div className={`agent-status-badge ${agent.status === 'active' ? 'working' : 'idle'}`}>
-                {agent.status === 'active' ? 'WORKING' : 'IDLE'}
+            <div className={`agent-status-badge ${agent.status === 'active' ? 'working' : agent.status === 'provisioning' ? 'provisioning' : agent.status === 'offline' ? 'offline' : 'idle'}`}>
+                {agent.status === 'active' ? 'WORKING' : agent.status === 'provisioning' ? 'PROV' : agent.status === 'offline' ? 'OFF' : agent.status === 'blocked' ? 'BLOCKED' : 'IDLE'}
             </div>
         </div>
     )
@@ -236,41 +262,22 @@ function AgentCard({ agent, isActive, isTracking, onClick, onTrack }: {
 
 // Agent Editor Component
 function AgentEditor({ agent, onClose }: { agent: Agent; onClose: () => void }) {
-    const [activeTab, setActiveTab] = useState<'soul' | 'memory'>('soul')
+    const [activeTab, setActiveTab] = useState<'soul' | 'memory' | 'config'>('soul')
     const [soulContent, setSoulContent] = useState('')
     const [memoryContent, setMemoryContent] = useState('')
     const [loading, setLoading] = useState(true)
     const [saving, setSaving] = useState(false)
     const updateStatus = useMutation(api.agents.updateStatus)
+    const updateSoul = useMutation(api.agents.updateSoul)
+
+    const isOnline = agent.lastSeen ? (Date.now() - agent.lastSeen) < 300000 : false
+    const emoji = agent.identityProfile?.emoji
 
     useEffect(() => {
         setLoading(true)
-        setSoulContent(`# ${agent.name} - ${agent.role}
-
-You are ${agent.name}, the ${agent.role} for the Mission Control team.
-
-## Personality
-- Professional and dedicated
-- Collaborative team player
-- Expert in your domain
-
-## Responsibilities
-- ${agent.role} tasks
-- Collaborate with other agents using @mentions
-- Report progress to @Jarvis
-
-## Communication Style
-- Clear and concise
-- Use @mentions to request help from specialists
-- Always update task status when working`)
-        setMemoryContent(`# ${agent.name} Memory
-
-## Recent Context
-- Last active: ${agent.lastSeen ? new Date(agent.lastSeen).toLocaleString() : 'Never'}
-- Current status: ${agent.status}
-
-## Working Notes
-(Add notes here that should persist between sessions)`)
+        // Load actual SOUL template from database if available
+        setSoulContent(agent.soulTemplate || `# ${agent.name} - ${agent.role}\n\nYou are ${agent.name}, the ${agent.role} for the Mission Control team.\n\n## Responsibilities\n- ${agent.role} tasks\n- Collaborate with other agents using @mentions\n- Report progress to @Jarvis`)
+        setMemoryContent(`# ${agent.name} Memory\n\n## Recent Context\n- Last active: ${agent.lastSeen ? new Date(agent.lastSeen).toLocaleString() : 'Never'}\n- Current status: ${agent.status}\n- Session: ${agent.openclawSessionId || 'Not bound'}\n- Provision: ${agent.provisionStatus || 'unknown'}\n\n## Working Notes\n(Add notes here that should persist between sessions)`)
         setLoading(false)
     }, [agent])
 
@@ -280,9 +287,14 @@ You are ${agent.name}, the ${agent.role} for the Mission Control team.
 
     const handleSave = async () => {
         setSaving(true)
-        await new Promise(resolve => setTimeout(resolve, 500))
+        try {
+            if (activeTab === 'soul') {
+                await updateSoul({ id: agent._id, soulTemplate: soulContent })
+            }
+        } catch (e) {
+            console.error('Save failed', e)
+        }
         setSaving(false)
-        alert('Changes saved!')
     }
 
     return (
@@ -290,14 +302,42 @@ You are ${agent.name}, the ${agent.role} for the Mission Control team.
             <div className="detail-header">
                 <div className="detail-title">
                     <div className={`agent-avatar large ${agent.level}`}>
-                        {getInitials(agent.name)}
+                        {emoji || getInitials(agent.name)}
+                        <span className={`online-dot ${isOnline ? 'online' : 'offline'}`} />
                     </div>
                     <div>
-                        <h3>{agent.name}</h3>
-                        <p>{agent.role}</p>
+                        <h3>{agent.name} {agent.isBoardLead && '★'}</h3>
+                        <p>{agent.identityProfile?.description || agent.role}</p>
                     </div>
                 </div>
                 <button className="modal-close" onClick={onClose}>×</button>
+            </div>
+
+            {/* Gateway Info Section */}
+            <div className="detail-section">
+                <label>Gateway Connection</label>
+                <div className="gateway-info">
+                    <div className="gateway-row">
+                        <span className="gateway-label">Session</span>
+                        <code className="session-key">{agent.openclawSessionId || 'Not bound'}</code>
+                    </div>
+                    <div className="gateway-row">
+                        <span className="gateway-label">Status</span>
+                        <span className={`provision-badge ${agent.provisionStatus === 'confirmed' ? 'confirmed' : agent.provisionStatus === 'failed' ? 'failed' : 'pending'}`}>
+                            {agent.provisionStatus === 'confirmed' ? '✓ Provisioned' : agent.provisionStatus === 'failed' ? '✗ Failed' : '⏳ Pending'}
+                        </span>
+                    </div>
+                    {agent.heartbeatConfig?.cronExpression && (
+                        <div className="gateway-row">
+                            <span className="gateway-label">Heartbeat</span>
+                            <code className="session-key">{agent.heartbeatConfig.cronExpression}</code>
+                        </div>
+                    )}
+                    <div className="gateway-row">
+                        <span className="gateway-label">Last Seen</span>
+                        <span>{agent.lastSeen ? formatTime(agent.lastSeen) : 'Never'}</span>
+                    </div>
+                </div>
             </div>
 
             <div className="detail-section">
@@ -325,11 +365,6 @@ You are ${agent.name}, the ${agent.role} for the Mission Control team.
             </div>
 
             <div className="detail-section">
-                <label>Session Key</label>
-                <code className="session-key">{agent.sessionKey}</code>
-            </div>
-
-            <div className="detail-section">
                 <label>Agent Files</label>
                 <div className="editor-tabs">
                     <button
@@ -344,11 +379,31 @@ You are ${agent.name}, the ${agent.role} for the Mission Control team.
                     >
                         Memory
                     </button>
+                    <button
+                        className={`editor-tab ${activeTab === 'config' ? 'active' : ''}`}
+                        onClick={() => setActiveTab('config')}
+                    >
+                        Config
+                    </button>
                 </div>
 
                 <div className="editor-content">
                     {loading ? (
                         <div className="empty-state"><p>Loading...</p></div>
+                    ) : activeTab === 'config' ? (
+                        <div className="config-view">
+                            <pre className="editor-textarea" style={{ fontFamily: 'monospace', fontSize: '12px' }}>
+                                {JSON.stringify({
+                                    sessionKey: agent.sessionKey,
+                                    openclawSessionId: agent.openclawSessionId,
+                                    level: agent.level,
+                                    isBoardLead: agent.isBoardLead,
+                                    provisionStatus: agent.provisionStatus,
+                                    identityProfile: agent.identityProfile,
+                                    heartbeatConfig: agent.heartbeatConfig,
+                                }, null, 2)}
+                            </pre>
+                        </div>
                     ) : (
                         <textarea
                             className="editor-textarea"
@@ -358,7 +413,7 @@ You are ${agent.name}, the ${agent.role} for the Mission Control team.
                     )}
                     <div className="editor-actions">
                         <button className="btn btn-secondary btn-sm" onClick={onClose}>Cancel</button>
-                        <button className="btn btn-primary btn-sm" onClick={handleSave} disabled={saving}>
+                        <button className="btn btn-primary btn-sm" onClick={handleSave} disabled={saving || activeTab === 'config'}>
                             {saving ? 'Saving...' : 'Save Changes'}
                         </button>
                     </div>
