@@ -3,18 +3,6 @@
         "ackReactionScope": "group-mentions"
     },
     "agents": {
-        "allowedSpawnAgents": [
-            "jarvis",
-            "shuri",
-            "fury",
-            "vision",
-            "loki",
-            "quill",
-            "wanda",
-            "pepper",
-            "friday",
-            "wong"
-        ],
         "defaults": {
             "maxConcurrent": 4,
             "subagents": {
@@ -39,7 +27,7 @@
         "mode": "local",
         "auth": {
             "mode": "token",
-            "token": "a5f40894a60c72afda9beeafb9b3b91d2a7679485ac8cb4a"
+            "token": "${OPENCLAW_GATEWAY_TOKEN}"
         },
         "port": 18789,
         "bind": "loopback",
@@ -66,7 +54,7 @@
     "channels": {
         "telegram": {
             "enabled": true,
-            "botToken": "8437598405:AAE5e_WMQzeYcFTgS8RXAuuIRM6yH7Miunw"
+            "botToken": "${TELEGRAM_BOT_TOKEN}"
         }
     },
     "skills": {

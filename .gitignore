@@ -29,5 +29,8 @@ server_key
 *.pem
 *.key
 
+# OpenClaw local config (contains tokens)
+openclaw.json
+
 # Build artifacts
 *.tsbuildinfo
