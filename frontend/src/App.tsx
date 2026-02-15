@@ -12,6 +12,7 @@ import { ActivityFeed } from './components/ActivityFeed'
 import { CronPanel } from './components/CronPanel'
 import { DispatchLog } from './components/DispatchLog'
 import { EventStream } from './components/EventStream'
+import { SupervisorPanel } from './components/SupervisorPanel'
 
 export function App() {
   const [page, setPage] = useState<Page>('dashboard')
@@ -57,6 +58,7 @@ export function App() {
             {page === 'dashboard' && 'System overview and recent activity'}
             {page === 'agents' && 'All registered agents and their status'}
             {page === 'tasks' && 'Task management and Kanban board'}
+            {page === 'supervisor' && 'Jarvis delegation engine and observability'}
             {page === 'activity' && 'Complete activity timeline'}
             {page === 'cron' && 'OpenClaw heartbeat and cron job status'}
             {page === 'dispatch' && 'Task dispatch logs and gateway status'}
@@ -118,6 +120,13 @@ export function App() {
               onRefresh={refreshAll}
               onDispatch={() => dispatchLogs.refresh()}
             />
+          </div>
+        )}
+
+        {/* ── Supervisor ─────────────────────────────────────────────────── */}
+        {page === 'supervisor' && (
+          <div className="animate-fade-in">
+            <SupervisorPanel />
           </div>
         )}
 

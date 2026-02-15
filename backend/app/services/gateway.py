@@ -224,9 +224,64 @@ async def ensure_session(
     return await gateway_call("sessions.patch", params, config=config)
 
 
-async def wake_agent(agent_id: str, *, config: GatewayConfig) -> Any:
-    """Wake an agent (trigger next heartbeat immediately)."""
-    return await gateway_call("wake", {"agentId": agent_id}, config=config)
+async def wake_agent(
+    agent_id: str,
+    *,
+    config: GatewayConfig,
+    mode: str = "heartbeat",
+    text: str | None = None,
+) -> Any:
+    """Wake an agent via chat.send with deliver=True.
+
+    The raw ``wake`` RPC requires ``mode`` and ``text`` fields and rejects
+    ``agentId``.  The reference Mission Control project never calls the
+    ``wake`` method directly — instead it uses ``chat.send`` with
+    ``deliver=True`` to the agent's heartbeat session.  We follow the
+    same approach for reliability, with a thin ``wake`` RPC fallback.
+    """
+    wakeup_text = text or (
+        f"Wake up, {agent_id}. "
+        "Read memory/WORKING.md, check mission_control/tasks.json "
+        "and mission_control/notifications.json for pending work."
+    )
+    session_key = f"agent:{agent_id}:cron:{agent_id}-heartbeat"
+
+    log.info(
+        "gateway.wake agent=%s session=%s mode=%s",
+        agent_id, session_key, mode,
+    )
+
+    # Primary path: ensure session then chat.send with deliver=True
+    try:
+        await ensure_session(session_key, config=config, label=agent_id)
+        result = await send_message(
+            wakeup_text,
+            session_key=session_key,
+            config=config,
+            deliver=True,
+        )
+        log.info("gateway.wake.ok agent=%s via=chat.send", agent_id)
+        return result
+    except GatewayError as send_err:
+        log.warning(
+            "gateway.wake.chat_send_failed agent=%s error=%s — trying wake RPC",
+            agent_id, send_err,
+        )
+
+    # Fallback: try the raw wake RPC with correct schema
+    try:
+        result = await gateway_call(
+            "wake",
+            {"mode": mode, "text": wakeup_text},
+            config=config,
+        )
+        log.info("gateway.wake.ok agent=%s via=wake_rpc", agent_id)
+        return result
+    except GatewayError as wake_err:
+        log.error(
+            "gateway.wake.failed agent=%s error=%s", agent_id, wake_err,
+        )
+        raise
 
 
 async def list_sessions(*, config: GatewayConfig) -> Any:

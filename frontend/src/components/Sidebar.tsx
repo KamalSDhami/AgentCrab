@@ -8,14 +8,16 @@ import {
   Radio,
   Send,
   Terminal,
+  BrainCircuit,
 } from 'lucide-react'
 
-export type Page = 'dashboard' | 'agents' | 'tasks' | 'activity' | 'cron' | 'dispatch' | 'events'
+export type Page = 'dashboard' | 'agents' | 'tasks' | 'activity' | 'cron' | 'dispatch' | 'events' | 'supervisor'
 
 const NAV: { id: Page; label: string; icon: React.ReactNode }[] = [
   { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard size={18} /> },
   { id: 'agents', label: 'Agents', icon: <Users size={18} /> },
   { id: 'tasks', label: 'Tasks', icon: <KanbanSquare size={18} /> },
+  { id: 'supervisor', label: 'Supervisor', icon: <BrainCircuit size={18} /> },
   { id: 'dispatch', label: 'Dispatch', icon: <Send size={18} /> },
   { id: 'activity', label: 'Activity', icon: <Activity size={18} /> },
   { id: 'events', label: 'Event Stream', icon: <Terminal size={18} /> },
@@ -63,7 +65,7 @@ export function Sidebar({ current, onChange }: Props) {
       {/* Footer */}
       <div className="px-4 py-3 border-t border-slate-700/30">
         <div className="text-[10px] text-slate-600">
-          AgentCrab v2.0
+          AgentCrab v2.2
         </div>
       </div>
     </aside>

@@ -113,30 +113,28 @@ def get_dispatch_for_task(task_id: str) -> list[dict[str, Any]]:
 def build_task_message(task: dict[str, Any], agent_id: str) -> str:
     """Construct a structured task dispatch message for an agent.
 
-    This message is sent via chat.send to the agent's heartbeat session.
-    Keep it concise — the agent already has a HEARTBEAT.md that tells it
-    to check mission_control/tasks.json for full details.
+    Routes through supervisor layer:
+    - If dispatching to Jarvis (supervisor): sends analysis/delegation message
+    - If dispatching to a worker: sends execution message
     """
-    title = task.get("title", "Untitled Task")
-    task_id = task.get("id", "unknown")
-    priority = task.get("priority", "normal")
-    description = task.get("description") or "No description provided."
+    from .supervisor import (
+        is_supervisor,
+        build_supervisor_analysis_message,
+        build_worker_task_message,
+        DelegationRecord,
+    )
 
-    return f"""📋 NEW TASK ASSIGNED — {title}
+    if is_supervisor(agent_id):
+        return build_supervisor_analysis_message(task)
 
-Task ID: {task_id}
-Priority: {priority.upper() if priority else 'NORMAL'}
-Assigned To: {agent_id}
-
-{description}
-
-ACTION REQUIRED:
-1. Check mission_control/tasks.json — find task {task_id}.
-2. Check mission_control/notifications.json — mark your notification delivered=true.
-3. Update memory/WORKING.md with your execution plan.
-4. Execute the task.
-5. When done, update the task status in mission_control/tasks.json to "done".
-6. Post a summary to mission_control/activities.json."""
+    # Worker dispatch — build delegation record for context
+    delegation = DelegationRecord(
+        task_id=task.get("id", ""),
+        worker_id=agent_id,
+        reason=f"Direct assignment to {agent_id}",
+        iteration=task.get("dispatch", {}).get("dispatchCount", 0) + 1,
+    )
+    return build_worker_task_message(task, agent_id, delegation)
 
 
 # ── Core dispatch logic ─────────────────────────────────────────────────────

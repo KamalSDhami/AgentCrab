@@ -1,4 +1,4 @@
-"""Dispatch and agent control API endpoints."""
+"""Dispatch, agent control, and observability API endpoints."""
 
 from __future__ import annotations
 
@@ -25,7 +25,7 @@ router = APIRouter(tags=["dispatch"])
 
 
 class DispatchRequest(BaseModel):
-    agent_id: str | None = None  # If None, dispatch to all assignees
+    agent_id: str | None = None
 
 
 class MessageRequest(BaseModel):
@@ -33,7 +33,8 @@ class MessageRequest(BaseModel):
 
 
 class WakeRequest(BaseModel):
-    pass
+    mode: str = "heartbeat"
+    text: str | None = None
 
 
 # ── Task dispatch ────────────────────────────────────────────────────────────
@@ -120,8 +121,16 @@ async def send_message_to_agent(
 
 
 @router.post("/agents/{agent_id}/wake")
-async def wake_agent_endpoint(agent_id: str) -> dict[str, Any]:
-    """Wake an agent (trigger immediate heartbeat)."""
+async def wake_agent_endpoint(
+    agent_id: str,
+    payload: WakeRequest | None = None,
+) -> dict[str, Any]:
+    """Wake an agent via chat.send with deliver=True.
+
+    Uses the same approach as the reference OpenClaw Mission Control:
+    ensure_session → chat.send(deliver=True) to agent heartbeat session.
+    Falls back to raw wake RPC with correct schema if chat.send fails.
+    """
     try:
         from ..services.gateway import GatewayConfig, wake_agent
 
@@ -129,12 +138,16 @@ async def wake_agent_endpoint(agent_id: str) -> dict[str, Any]:
             url=f"ws://127.0.0.1:{settings.gateway_port}",
             token=settings.gateway_token,
         )
-        result = await wake_agent(agent_id, config=config)
-        log.info("agent.wake agent=%s", agent_id)
-        return {"ok": True, "result": str(result)[:500]}
+        mode = payload.mode if payload else "heartbeat"
+        text = payload.text if payload else None
+        result = await wake_agent(
+            agent_id, config=config, mode=mode, text=text,
+        )
+        log.info("agent.wake.ok agent=%s", agent_id)
+        return {"ok": True, "agent": agent_id, "result": str(result)[:500]}
     except Exception as e:
         log.error("agent.wake.failed agent=%s error=%s", agent_id, e)
-        raise HTTPException(status_code=502, detail=str(e))
+        raise HTTPException(status_code=502, detail=f"Wake failed: {e}")
 
 
 # ── Gateway health ───────────────────────────────────────────────────────────
@@ -154,3 +167,67 @@ async def gateway_health_endpoint() -> dict[str, Any]:
         return {"ok": True, "gateway": result}
     except Exception as e:
         return {"ok": False, "error": str(e)}
+
+
+# ── Observability: Delegation & Supervisor ───────────────────────────────────
+
+
+@router.get("/supervisor/delegations")
+def delegation_log_endpoint(limit: int = 100) -> list[dict[str, Any]]:
+    """Return recent delegation records from the supervisor layer."""
+    from ..services.supervisor import get_delegation_log
+    return get_delegation_log(limit)
+
+
+@router.get("/supervisor/capabilities")
+def capabilities_endpoint() -> dict[str, Any]:
+    """Return the full agent capability registry."""
+    from ..services.supervisor import AGENT_CAPABILITIES
+    return AGENT_CAPABILITIES
+
+
+@router.get("/supervisor/state-machine")
+def state_machine_endpoint() -> dict[str, Any]:
+    """Return the valid state transitions for reference."""
+    from ..services.supervisor import VALID_TRANSITIONS
+    return {"transitions": VALID_TRANSITIONS}
+
+
+@router.get("/rpc/payload/{task_id}")
+def rpc_payload_viewer(task_id: str) -> dict[str, Any]:
+    """View the RPC payload that would be sent for a task dispatch.
+
+    Useful for debugging — shows exactly what message and params
+    the gateway would receive, without actually sending.
+    """
+    tasks = read_table(settings.mc_root, "tasks.json")
+    task = next((t for t in tasks if t.get("id") == task_id), None)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    from ..services.dispatcher import build_task_message
+    assignees = task.get("assigneeIds") or []
+    payloads = []
+    for aid in assignees:
+        msg = build_task_message(task, aid)
+        session_key = f"agent:{aid}:cron:{aid}-heartbeat"
+        payloads.append({
+            "agentId": aid,
+            "sessionKey": session_key,
+            "deliver": True,
+            "messagePreview": msg[:500],
+            "messageLength": len(msg),
+            "rpcMethod": "chat.send",
+            "rpcParams": {
+                "sessionKey": session_key,
+                "message": msg,
+                "deliver": True,
+                "idempotencyKey": "<uuid>",
+            },
+        })
+
+    return {
+        "taskId": task_id,
+        "assignees": assignees,
+        "payloads": payloads,
+    }

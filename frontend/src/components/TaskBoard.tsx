@@ -1,7 +1,13 @@
-import React, { useState } from 'react'
+import React, { useState, useRef, useEffect, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import clsx from 'clsx'
 import { Task, TaskStatus, Agent, api } from '../api'
-import { MoreHorizontal, Trash2, Send, RotateCcw, Loader2 } from 'lucide-react'
+import {
+  MoreHorizontal, Trash2, Send, Loader2, Pencil, Eye,
+  BrainCircuit, GitBranch, SearchCheck,
+} from 'lucide-react'
+import { TaskEditModal } from './TaskEditModal'
+import { TaskResultModal } from './TaskResultModal'
 
 const COLUMNS: { status: TaskStatus; label: string; accent: string }[] = [
   { status: 'inbox', label: 'Inbox', accent: 'border-t-slate-500' },
@@ -11,6 +17,53 @@ const COLUMNS: { status: TaskStatus; label: string; accent: string }[] = [
   { status: 'done', label: 'Done', accent: 'border-t-emerald-500' },
 ]
 
+/* ── Supervisor state badges ─────────────────────────────────────── */
+const SUPERVISOR_STATES: Record<string, { label: string; color: string; icon: React.ReactNode }> = {
+  analyzing:  { label: 'Analyzing',  color: 'text-cyan-400 bg-cyan-500/10 border-cyan-500/20',   icon: <BrainCircuit size={10} /> },
+  delegated:  { label: 'Delegated',  color: 'text-violet-400 bg-violet-500/10 border-violet-500/20', icon: <GitBranch size={10} /> },
+  reviewing:  { label: 'Reviewing',  color: 'text-amber-400 bg-amber-500/10 border-amber-500/20',   icon: <SearchCheck size={10} /> },
+}
+
+/* ── Portal dropdown menu ────────────────────────────────────────── */
+function PortalMenu({
+  anchorRef,
+  children,
+  onClose,
+}: {
+  anchorRef: React.RefObject<HTMLButtonElement | null>
+  children: React.ReactNode
+  onClose: () => void
+}) {
+  const [pos, setPos] = useState({ top: 0, left: 0 })
+
+  useEffect(() => {
+    const el = anchorRef.current
+    if (!el) return
+    const rect = el.getBoundingClientRect()
+    setPos({ top: rect.bottom + 4, left: Math.min(rect.right - 180, window.innerWidth - 200) })
+  }, [anchorRef])
+
+  // Close on outside click
+  useEffect(() => {
+    function handler(e: MouseEvent) {
+      if (anchorRef.current?.contains(e.target as Node)) return
+      onClose()
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [onClose, anchorRef])
+
+  return createPortal(
+    <div
+      className="fixed z-[200] glass-panel p-1 min-w-[180px] animate-fade-in rounded-lg shadow-xl shadow-black/40 border border-slate-700/50"
+      style={{ top: pos.top, left: pos.left }}
+    >
+      {children}
+    </div>,
+    document.body,
+  )
+}
+
 interface Props {
   tasks: Task[] | null
   agents: Agent[] | null
@@ -18,20 +71,26 @@ interface Props {
   onDispatch?: (id: string) => void
 }
 
+/* ── Task Card ───────────────────────────────────────────────────── */
 function TaskCard({
   task,
   agents,
   onStatusChange,
   onDelete,
   onDispatch,
+  onEdit,
+  onViewResult,
 }: {
   task: Task
   agents: Agent[] | null
   onStatusChange: (id: string, status: TaskStatus) => void
   onDelete: (id: string) => void
   onDispatch: (id: string) => void
+  onEdit: (task: Task) => void
+  onViewResult: (task: Task) => void
 }) {
   const [showMenu, setShowMenu] = useState(false)
+  const menuBtnRef = useRef<HTMLButtonElement | null>(null)
   const agentMap = new Map((agents ?? []).map((a) => [a.id, a]))
 
   const priorityColors: Record<string, string> = {
@@ -43,19 +102,44 @@ function TaskCard({
   const dsp = task.dispatch
   const dispatchStatus = dsp?.lastDispatchStatus
   const hasAssignees = (task.assigneeIds ?? []).length > 0
+  const supervisorState = (task as any).supervisorState as string | undefined
+  const stateInfo = supervisorState ? SUPERVISOR_STATES[supervisorState] : null
+  const hasResult = !!(task.result || task.status === 'done')
 
   return (
     <div className="glass-card p-3 group relative">
       <div className="flex items-start justify-between gap-2">
-        <div className="font-medium text-sm text-slate-200 leading-snug">
+        <div className="font-medium text-sm text-slate-200 leading-snug flex-1">
           {task.title}
         </div>
-        <button
-          onClick={() => setShowMenu(!showMenu)}
-          className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-slate-700/50 text-slate-500 transition-all"
-        >
-          <MoreHorizontal size={14} />
-        </button>
+        <div className="flex items-center gap-0.5 shrink-0">
+          {/* Edit button */}
+          <button
+            onClick={() => onEdit(task)}
+            className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-slate-700/50 text-slate-500 hover:text-slate-300 transition-all"
+            title="Edit task"
+          >
+            <Pencil size={12} />
+          </button>
+          {/* View result button - only for done/review tasks */}
+          {hasResult && (
+            <button
+              onClick={() => onViewResult(task)}
+              className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-emerald-700/30 text-emerald-500 hover:text-emerald-300 transition-all"
+              title="View result"
+            >
+              <Eye size={12} />
+            </button>
+          )}
+          {/* More menu */}
+          <button
+            ref={menuBtnRef}
+            onClick={() => setShowMenu(!showMenu)}
+            className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-slate-700/50 text-slate-500 transition-all"
+          >
+            <MoreHorizontal size={14} />
+          </button>
+        </div>
       </div>
 
       {task.description && (
@@ -76,6 +160,15 @@ function TaskCard({
           </span>
         ))}
       </div>
+
+      {/* Supervisor state indicator */}
+      {stateInfo && (
+        <div className="mt-2">
+          <span className={clsx('inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full border', stateInfo.color)}>
+            {stateInfo.icon} {stateInfo.label}
+          </span>
+        </div>
+      )}
 
       {/* Dispatch status indicator */}
       {dsp && (
@@ -109,9 +202,24 @@ function TaskCard({
         </button>
       )}
 
-      {/* Quick action menu */}
+      {/* Portal-rendered dropdown menu (fixes z-index stacking bug) */}
       {showMenu && (
-        <div className="absolute right-2 top-10 z-20 glass-panel p-1 min-w-[160px] animate-fade-in">
+        <PortalMenu anchorRef={menuBtnRef} onClose={() => setShowMenu(false)}>
+          <button
+            onClick={() => { onEdit(task); setShowMenu(false) }}
+            className="w-full text-left px-3 py-1.5 text-xs text-slate-300 hover:bg-slate-700/50 rounded flex items-center gap-2"
+          >
+            <Pencil size={12} /> Edit task
+          </button>
+          {hasResult && (
+            <button
+              onClick={() => { onViewResult(task); setShowMenu(false) }}
+              className="w-full text-left px-3 py-1.5 text-xs text-emerald-400 hover:bg-emerald-500/10 rounded flex items-center gap-2"
+            >
+              <Eye size={12} /> View result
+            </button>
+          )}
+          <hr className="border-slate-700/30 my-1" />
           {COLUMNS.filter((c) => c.status !== task.status).map((c) => (
             <button
               key={c.status}
@@ -139,13 +247,17 @@ function TaskCard({
           >
             <Trash2 size={12} /> Delete
           </button>
-        </div>
+        </PortalMenu>
       )}
     </div>
   )
 }
 
+/* ── Task Board ──────────────────────────────────────────────────── */
 export function TaskBoard({ tasks, agents, onRefresh, onDispatch: externalDispatch }: Props) {
+  const [editTask, setEditTask] = useState<Task | null>(null)
+  const [resultTask, setResultTask] = useState<Task | null>(null)
+
   async function handleStatusChange(id: string, status: TaskStatus) {
     await api.updateTask(id, { status })
     onRefresh()
@@ -184,39 +296,61 @@ export function TaskBoard({ tasks, agents, onRefresh, onDispatch: externalDispat
   }
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-5 gap-3">
-      {COLUMNS.map((col) => {
-        const items = byStatus.get(col.status) ?? []
-        return (
-          <div key={col.status} className={clsx('kanban-column border-t-2', col.accent)}>
-            <div className="flex items-center justify-between mb-2">
-              <h3 className="text-xs font-bold uppercase tracking-wide text-slate-400">
-                {col.label}
-              </h3>
-              <span className="text-xs text-slate-600 bg-slate-800/50 px-1.5 py-0.5 rounded">
-                {items.length}
-              </span>
+    <>
+      <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-5 gap-3">
+        {COLUMNS.map((col) => {
+          const items = byStatus.get(col.status) ?? []
+          return (
+            <div key={col.status} className={clsx('kanban-column border-t-2', col.accent)}>
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-xs font-bold uppercase tracking-wide text-slate-400">
+                  {col.label}
+                </h3>
+                <span className="text-xs text-slate-600 bg-slate-800/50 px-1.5 py-0.5 rounded">
+                  {items.length}
+                </span>
+              </div>
+              <div className="flex flex-col gap-2">
+                {items.map((t) => (
+                  <TaskCard
+                    key={t.id}
+                    task={t}
+                    agents={agents}
+                    onStatusChange={handleStatusChange}
+                    onDelete={handleDelete}
+                    onDispatch={handleDispatch}
+                    onEdit={setEditTask}
+                    onViewResult={setResultTask}
+                  />
+                ))}
+                {items.length === 0 && (
+                  <div className="text-xs text-slate-600 text-center py-6">
+                    No tasks
+                  </div>
+                )}
+              </div>
             </div>
-            <div className="flex flex-col gap-2">
-              {items.map((t) => (
-                <TaskCard
-                  key={t.id}
-                  task={t}
-                  agents={agents}
-                  onStatusChange={handleStatusChange}
-                  onDelete={handleDelete}
-                  onDispatch={handleDispatch}
-                />
-              ))}
-              {items.length === 0 && (
-                <div className="text-xs text-slate-600 text-center py-6">
-                  No tasks
-                </div>
-              )}
-            </div>
-          </div>
-        )
-      })}
-    </div>
+          )
+        })}
+      </div>
+
+      {/* Edit modal */}
+      {editTask && (
+        <TaskEditModal
+          task={editTask}
+          agents={agents}
+          onClose={() => setEditTask(null)}
+          onSaved={() => { setEditTask(null); onRefresh() }}
+        />
+      )}
+
+      {/* Result modal */}
+      {resultTask && (
+        <TaskResultModal
+          task={resultTask}
+          onClose={() => setResultTask(null)}
+        />
+      )}
+    </>
   )
 }

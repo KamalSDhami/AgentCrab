@@ -36,6 +36,10 @@ export interface Task {
   deadline?: string | null
   createdAtMs?: number
   updatedAtMs?: number
+  result?: TaskResult | null
+  stateHistory?: StateTransition[]
+  editHistory?: EditAudit[]
+  delegation?: DelegationRecord | null
   dispatch?: {
     lastDispatchAtMs?: number
     lastDispatchStatus?: string
@@ -44,6 +48,43 @@ export interface Task {
     lastError?: string | null
     history?: DispatchRecord[]
   }
+}
+
+export interface TaskResult {
+  resultContent: string
+  resultSummary: string
+  resultFiles: string[]
+  resultMetadata: Record<string, any>
+  executionLog: string
+  completedAtMs: number
+}
+
+export interface StateTransition {
+  from: string | null
+  to: string
+  actor: string
+  reason: string
+  atMs: number
+}
+
+export interface EditAudit {
+  changes: Record<string, any>
+  before: Record<string, any>
+  atMs: number
+  version: number
+}
+
+export interface DelegationRecord {
+  id: string
+  taskId: string
+  supervisorId: string
+  workerId: string
+  reason: string
+  skillsMatched: string[]
+  state: string
+  feedback: string | null
+  iteration: number
+  createdAtMs: number
 }
 
 export interface ActivityEvent {
@@ -174,8 +215,38 @@ export const api = {
       body: JSON.stringify({ message }),
     }),
   wakeAgent: (agentId: string) =>
-    request<any>(`/api/agents/${encodeURIComponent(agentId)}/wake`, { method: 'POST' }),
+    request<any>(`/api/agents/${encodeURIComponent(agentId)}/wake`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({}),
+    }),
 
   // Gateway
   gatewayHealth: () => request<GatewayHealth>('/api/gateway/health'),
+
+  // Task results
+  getTaskResult: (taskId: string) =>
+    request<{ taskId: string; result: TaskResult }>(`/api/tasks/${encodeURIComponent(taskId)}/result`),
+
+  // Task history & delegations
+  getTaskHistory: (taskId: string) =>
+    request<{ taskId: string; stateHistory: StateTransition[]; editHistory: EditAudit[]; delegation: DelegationRecord | null }>(
+      `/api/tasks/${encodeURIComponent(taskId)}/history`
+    ),
+  getTaskDelegations: (taskId: string) =>
+    request<DelegationRecord[]>(`/api/tasks/${encodeURIComponent(taskId)}/delegations`),
+  getCapabilityMatch: (taskId: string) =>
+    request<{ taskId: string; suggestedAgent: string | null; capabilities: Record<string, any> }>(
+      `/api/tasks/${encodeURIComponent(taskId)}/capabilities`
+    ),
+
+  // Supervisor/observability
+  getDelegationLog: (limit = 100) =>
+    request<DelegationRecord[]>(`/api/supervisor/delegations?limit=${limit}`),
+  getCapabilities: () =>
+    request<Record<string, any>>('/api/supervisor/capabilities'),
+  getStateMachine: () =>
+    request<{ transitions: Record<string, string[]> }>('/api/supervisor/state-machine'),
+  getRpcPayload: (taskId: string) =>
+    request<any>(`/api/rpc/payload/${encodeURIComponent(taskId)}`),
 }
