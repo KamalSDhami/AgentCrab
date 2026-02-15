@@ -1,0 +1,12 @@
+[
+  {"id":"jarvis","name":"Jarvis","role":"Squad Lead","status":"idle","currentTaskId":null},
+  {"id":"shuri","name":"Shuri","role":"Product Analyst","status":"idle","currentTaskId":null},
+  {"id":"fury","name":"Fury","role":"Customer Researcher","status":"idle","currentTaskId":null},
+  {"id":"vision","name":"Vision","role":"SEO Analyst","status":"idle","currentTaskId":null},
+  {"id":"loki","name":"Loki","role":"Content Writer","status":"idle","currentTaskId":null},
+  {"id":"quill","name":"Quill","role":"Social Media Manager","status":"idle","currentTaskId":null},
+  {"id":"wanda","name":"Wanda","role":"Designer","status":"idle","currentTaskId":null},
+  {"id":"pepper","name":"Pepper","role":"Email Marketing","status":"idle","currentTaskId":null},
+  {"id":"friday","name":"Friday","role":"Developer","status":"idle","currentTaskId":null},
+  {"id":"wong","name":"Wong","role":"Documentation","status":"idle","currentTaskId":null}
+]
