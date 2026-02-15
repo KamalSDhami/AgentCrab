@@ -1,0 +1,100 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(100, 116, 139, 0.3) transparent;
+  }
+
+  *::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  *::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  *::-webkit-scrollbar-thumb {
+    background: rgba(100, 116, 139, 0.3);
+    border-radius: 3px;
+  }
+
+  body {
+    background-image:
+      radial-gradient(1200px 600px at 15% 8%, rgba(79, 70, 229, 0.12), transparent 60%),
+      radial-gradient(900px 600px at 85% 12%, rgba(16, 185, 129, 0.08), transparent 55%),
+      radial-gradient(1000px 700px at 50% 95%, rgba(236, 72, 153, 0.06), transparent 60%);
+    background-attachment: fixed;
+  }
+}
+
+@layer components {
+  .glass-panel {
+    @apply bg-slate-900/60 border border-slate-700/40 rounded-xl
+           backdrop-blur-[16px] shadow-xl shadow-black/20;
+  }
+
+  .glass-card {
+    @apply bg-slate-800/50 border border-slate-700/30 rounded-lg
+           backdrop-blur-sm transition-all duration-200;
+  }
+
+  .glass-card-interactive {
+    @apply glass-card hover:bg-slate-700/50 hover:border-slate-600/40
+           hover:-translate-y-0.5 cursor-pointer;
+  }
+
+  .stat-card {
+    @apply glass-panel p-4 flex flex-col gap-1;
+  }
+
+  .badge {
+    @apply inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium
+           border transition-colors;
+  }
+
+  .badge-idle {
+    @apply bg-slate-700/50 text-slate-300 border-slate-600/30;
+  }
+
+  .badge-running {
+    @apply bg-emerald-500/15 text-emerald-400 border-emerald-500/25;
+  }
+
+  .badge-offline {
+    @apply bg-rose-500/15 text-rose-400 border-rose-500/25;
+  }
+
+  .badge-unknown {
+    @apply bg-amber-500/15 text-amber-400 border-amber-500/25;
+  }
+
+  .kanban-column {
+    @apply glass-panel p-3 min-h-[200px] flex flex-col gap-2;
+  }
+
+  .btn-primary {
+    @apply px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500
+           text-white text-sm font-medium transition-colors
+           focus:outline-none focus:ring-2 focus:ring-indigo-500/50;
+  }
+
+  .btn-ghost {
+    @apply px-3 py-1.5 rounded-lg text-slate-400 hover:text-slate-200
+           hover:bg-slate-700/50 text-sm transition-colors;
+  }
+
+  .input-field {
+    @apply w-full px-3 py-2 rounded-lg bg-slate-800/80 border border-slate-700/50
+           text-slate-100 placeholder-slate-500 text-sm
+           focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-500/40
+           transition-colors;
+  }
+
+  .select-field {
+    @apply input-field appearance-none cursor-pointer;
+  }
+}
