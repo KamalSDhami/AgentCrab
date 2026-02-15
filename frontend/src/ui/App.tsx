@@ -8,6 +8,16 @@ type AgentRow = {
   currentTaskId: string | null
 }
 
+type TaskStatus = 'inbox' | 'assigned' | 'in_progress' | 'review' | 'done' | string
+
+type TaskRow = {
+  id: string
+  title: string
+  description?: string
+  status: TaskStatus
+  assigneeIds?: string[]
+}
+
 type CronList = {
   ok?: boolean
   error?: unknown
@@ -50,6 +60,7 @@ function fmtTime(ms?: number) {
 
 export function App() {
   const [agents, setAgents] = useState<AgentRow[] | null>(null)
+  const [tasks, setTasks] = useState<TaskRow[] | null>(null)
   const [cron, setCron] = useState<CronList | null>(null)
   const [activity, setActivity] = useState<ActivityRow[] | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -63,9 +74,11 @@ export function App() {
         fetchJson<CronList>('/api/cron'),
         fetchJson<ActivityRow[]>('/api/mc/activities.json'),
       ])
+      const tasksData = await fetchJson<TaskRow[]>('/api/mc/tasks.json')
       setAgents(agentsData)
       setCron(cronData?.jobs ? cronData : { jobs: [] })
       setActivity(activityData)
+      setTasks(tasksData)
       setLastRefresh(Date.now())
     } catch (e: any) {
       setError(e?.message ?? String(e))
@@ -93,101 +106,165 @@ export function App() {
     return rows.slice(0, 30)
   }, [activity])
 
+  const agentById = useMemo(() => {
+    const map = new Map<string, AgentRow>()
+    for (const a of agents ?? []) map.set(a.id, a)
+    return map
+  }, [agents])
+
+  const tasksByStatus = useMemo(() => {
+    const statuses: TaskStatus[] = ['inbox', 'assigned', 'in_progress', 'review', 'done']
+    const map = new Map<TaskStatus, TaskRow[]>()
+    for (const s of statuses) map.set(s, [])
+    for (const t of tasks ?? []) {
+      const bucket = map.get(t.status) ?? []
+      bucket.push(t)
+      map.set(t.status, bucket)
+    }
+    for (const arr of map.values()) {
+      arr.sort((a, b) => (a.title ?? '').localeCompare(b.title ?? ''))
+    }
+    return { map, statuses }
+  }, [tasks])
+
+  function agentName(agentId?: string) {
+    if (!agentId) return '—'
+    return agentById.get(agentId)?.name ?? agentId
+  }
+
+  function assigneeBadges(task: TaskRow) {
+    const assignees = task.assigneeIds ?? []
+    if (assignees.length === 0) return null
+    return (
+      <div className="assignees">
+        {assignees.map((id) => (
+          <span key={id} className="pill">@{agentName(id)}</span>
+        ))}
+      </div>
+    )
+  }
+
+  function statusLabel(status: TaskStatus) {
+    switch (status) {
+      case 'inbox':
+        return 'Inbox'
+      case 'assigned':
+        return 'Assigned'
+      case 'in_progress':
+        return 'In Progress'
+      case 'review':
+        return 'Review'
+      case 'done':
+        return 'Done'
+      default:
+        return status
+    }
+  }
+
   return (
-    <div style={{ fontFamily: 'system-ui, Segoe UI, Roboto, Arial', padding: 16, maxWidth: 1200, margin: '0 auto' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'baseline' }}>
-        <h1 style={{ margin: 0 }}>Agent Monitor</h1>
-        <div style={{ fontSize: 12, opacity: 0.8 }}>
-          API: {API_BASE} · last refresh: {lastRefresh ? new Date(lastRefresh).toLocaleTimeString() : '—'}
+    <div className="container">
+      <div className="topbar">
+        <h1 className="title">Mission Control</h1>
+        <div className="meta">
+          API: {API_BASE} · refresh: 15s · last: {lastRefresh ? new Date(lastRefresh).toLocaleTimeString() : '—'}
         </div>
       </div>
 
-      {error ? (
-        <div style={{ marginTop: 12, padding: 12, border: '1px solid #d33', borderRadius: 8, color: '#d33' }}>
-          {error}
-        </div>
-      ) : null}
+      {error ? <div className="error">{error}</div> : null}
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 16, marginTop: 16 }}>
-        <section style={{ border: '1px solid #ddd', borderRadius: 8, padding: 12 }}>
-          <h2 style={{ marginTop: 0 }}>Agents</h2>
+      <div className="grid">
+        <section className="panel">
+          <h2>Agents</h2>
           {!agents ? (
-            <div>Loading…</div>
+            <div className="meta">Loading…</div>
           ) : (
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <thead>
-                <tr>
-                  <th style={{ textAlign: 'left', borderBottom: '1px solid #eee', padding: '6px 8px' }}>Agent</th>
-                  <th style={{ textAlign: 'left', borderBottom: '1px solid #eee', padding: '6px 8px' }}>Role</th>
-                  <th style={{ textAlign: 'left', borderBottom: '1px solid #eee', padding: '6px 8px' }}>Status</th>
-                  <th style={{ textAlign: 'left', borderBottom: '1px solid #eee', padding: '6px 8px' }}>Current Task</th>
-                </tr>
-              </thead>
-              <tbody>
-                {agents.map((a: AgentRow) => (
-                  <tr key={a.id}>
-                    <td style={{ padding: '6px 8px', borderBottom: '1px solid #f3f3f3' }}>{a.name} ({a.id})</td>
-                    <td style={{ padding: '6px 8px', borderBottom: '1px solid #f3f3f3' }}>{a.role}</td>
-                    <td style={{ padding: '6px 8px', borderBottom: '1px solid #f3f3f3' }}>{a.status}</td>
-                    <td style={{ padding: '6px 8px', borderBottom: '1px solid #f3f3f3' }}>{a.currentTaskId ?? '—'}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <div className="agentList">
+              {agents.map((a) => {
+                const assignedCount = (tasks ?? []).filter((t) => (t.assigneeIds ?? []).includes(a.id) && t.status !== 'done').length
+                const currentTask = a.currentTaskId ? (tasks ?? []).find((t) => t.id === a.currentTaskId) : undefined
+                return (
+                  <div key={a.id} className="agentCard">
+                    <div className="agentRow">
+                      <div>
+                        <div className="agentName">{a.name}</div>
+                        <div className="agentRole">{a.role}</div>
+                      </div>
+                      <div className="pill">{a.status}</div>
+                    </div>
+                    <div className="small">
+                      {currentTask ? (
+                        <>Current: {currentTask.title}</>
+                      ) : (
+                        <>Assigned: {assignedCount}</>
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
           )}
         </section>
 
-        <section style={{ border: '1px solid #ddd', borderRadius: 8, padding: 12 }}>
-          <h2 style={{ marginTop: 0 }}>Heartbeats (Cron)</h2>
-          {!cron ? (
-            <div>Loading…</div>
+        <section className="panel">
+          <h2>Mission Queue</h2>
+          {!tasks ? (
+            <div className="meta">Loading…</div>
+          ) : tasks.length === 0 ? (
+            <div className="meta">No tasks yet. Add items to `mission_control/tasks.json`.</div>
           ) : (
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <thead>
-                <tr>
-                  <th style={{ textAlign: 'left', borderBottom: '1px solid #eee', padding: '6px 8px' }}>Agent</th>
-                  <th style={{ textAlign: 'left', borderBottom: '1px solid #eee', padding: '6px 8px' }}>Schedule</th>
-                  <th style={{ textAlign: 'left', borderBottom: '1px solid #eee', padding: '6px 8px' }}>Next</th>
-                  <th style={{ textAlign: 'left', borderBottom: '1px solid #eee', padding: '6px 8px' }}>Last Status</th>
-                  <th style={{ textAlign: 'left', borderBottom: '1px solid #eee', padding: '6px 8px' }}>Last Error</th>
-                </tr>
-              </thead>
-              <tbody>
-                {heartbeatJobs.map((j: CronList['jobs'][number]) => (
-                  <tr key={j.id}>
-                    <td style={{ padding: '6px 8px', borderBottom: '1px solid #f3f3f3' }}>{j.agentId ?? '—'}</td>
-                    <td style={{ padding: '6px 8px', borderBottom: '1px solid #f3f3f3' }}>{j.schedule.expr ?? j.schedule.kind}</td>
-                    <td style={{ padding: '6px 8px', borderBottom: '1px solid #f3f3f3' }}>{fmtTime(j.state?.nextRunAtMs)}</td>
-                    <td style={{ padding: '6px 8px', borderBottom: '1px solid #f3f3f3' }}>{j.state?.lastStatus ?? '—'}</td>
-                    <td style={{ padding: '6px 8px', borderBottom: '1px solid #f3f3f3' }}>{j.state?.lastError ?? '—'}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <div className="board">
+              {tasksByStatus.statuses.map((s) => {
+                const items = tasksByStatus.map.get(s) ?? []
+                return (
+                  <div key={s} className="column">
+                    <div className="columnHeader">
+                      <div className="columnTitle">{statusLabel(s)}</div>
+                      <div className="count">{items.length}</div>
+                    </div>
+                    {items.map((t) => (
+                      <div key={t.id} className="task">
+                        <div className="taskTitle">{t.title}</div>
+                        {t.description ? <div className="taskDesc">{t.description}</div> : null}
+                        {assigneeBadges(t)}
+                      </div>
+                    ))}
+                  </div>
+                )
+              })}
+            </div>
           )}
         </section>
 
-        <section style={{ border: '1px solid #ddd', borderRadius: 8, padding: 12 }}>
-          <h2 style={{ marginTop: 0 }}>Recent Activity</h2>
+        <section className="panel">
+          <h2>Live Feed</h2>
           {!activity ? (
-            <div>Loading…</div>
+            <div className="meta">Loading…</div>
           ) : activityRows.length === 0 ? (
-            <div>No activity yet (write entries to `mission_control/activities.json`).</div>
+            <div className="meta">No activity yet. Write entries to `mission_control/activities.json`.</div>
           ) : (
-            <ul style={{ listStyle: 'none', paddingLeft: 0, margin: 0 }}>
-              {activityRows.map((r: ActivityRow, idx: number) => (
-                <li key={idx} style={{ padding: '8px 0', borderBottom: '1px solid #f3f3f3' }}>
-                  <div style={{ fontSize: 12, opacity: 0.8 }}>{r.ts ?? r.createdAt ?? '—'} · {r.agentId ?? '—'} · {r.type ?? 'activity'}</div>
+            <div className="feed">
+              {activityRows.map((r, idx) => (
+                <div key={idx} className="feedItem">
+                  <div className="feedMeta">
+                    {r.ts ?? r.createdAt ?? '—'} · {agentName(r.agentId)} · {r.type ?? 'activity'}
+                  </div>
                   <div>{r.message ?? '—'}</div>
-                </li>
+                </div>
               ))}
-            </ul>
+            </div>
           )}
-        </section>
-      </div>
 
-      <div style={{ marginTop: 16, fontSize: 12, opacity: 0.8 }}>
-        Refreshes every 15s. Heartbeats are muted (cron runs logged only).
+          <div style={{ marginTop: 10 }}>
+            <h2>Heartbeats</h2>
+            {!cron ? (
+              <div className="meta">Loading…</div>
+            ) : (
+              <div className="meta">
+                {heartbeatJobs.length} jobs · last statuses update via `openclaw cron list --json` (delivery muted).
+              </div>
+            )}
+          </div>
+        </section>
       </div>
     </div>
   )
