@@ -32,6 +32,16 @@ class Settings(BaseSettings):
     # SSE keepalive interval in seconds
     sse_keepalive: int = 15
 
+    # OpenClaw Gateway
+    gateway_port: int = 18789
+    gateway_token: str = ""
+
+    # Dispatch settings
+    auto_dispatch: bool = True           # auto-dispatch tasks on create/assign
+    dispatch_retry_max: int = 3          # max auto-retries
+    dispatch_stale_minutes: int = 30     # re-dispatch after this many minutes
+    orchestrator_enabled: bool = True    # run background orchestrator loop
+
 
 settings = Settings()
 

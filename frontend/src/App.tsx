@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from 'react'
-import { api, Agent, Task, ActivityEvent, Overview, CronList } from './api'
+import { api, Agent, Task, ActivityEvent, Overview, CronList, DispatchRecord } from './api'
 import { useFetch, useSSE } from './hooks'
 
 import { Sidebar, Page } from './components/Sidebar'
@@ -10,6 +10,8 @@ import { TaskBoard } from './components/TaskBoard'
 import { TaskCreate } from './components/TaskCreate'
 import { ActivityFeed } from './components/ActivityFeed'
 import { CronPanel } from './components/CronPanel'
+import { DispatchLog } from './components/DispatchLog'
+import { EventStream } from './components/EventStream'
 
 export function App() {
   const [page, setPage] = useState<Page>('dashboard')
@@ -21,14 +23,16 @@ export function App() {
   const tasks = useFetch<Task[]>(api.tasks, [], 15_000)
   const activity = useFetch<ActivityEvent[]>(() => api.activity(200), [], 15_000)
   const cron = useFetch<CronList>(api.cron, [], 30_000)
+  const dispatchLogs = useFetch<DispatchRecord[]>(() => api.dispatchLogs(100), [], 10_000)
 
   // SSE for real-time task updates
   useSSE(
     useCallback((_type: string, _data: any) => {
-      // Refresh tasks and activity on any SSE event
+      // Refresh tasks, activity, and dispatch logs on any SSE event
       tasks.refresh()
       activity.refresh()
       overview.refresh()
+      dispatchLogs.refresh()
     }, []),
   )
 
@@ -55,6 +59,8 @@ export function App() {
             {page === 'tasks' && 'Task management and Kanban board'}
             {page === 'activity' && 'Complete activity timeline'}
             {page === 'cron' && 'OpenClaw heartbeat and cron job status'}
+            {page === 'dispatch' && 'Task dispatch logs and gateway status'}
+            {page === 'events' && 'Real-time SSE event stream'}
           </p>
         </div>
 
@@ -106,7 +112,12 @@ export function App() {
         {page === 'tasks' && (
           <div className="space-y-4 animate-fade-in">
             <TaskCreate agents={agents.data} onCreated={refreshAll} />
-            <TaskBoard tasks={tasks.data} agents={agents.data} onRefresh={refreshAll} />
+            <TaskBoard
+              tasks={tasks.data}
+              agents={agents.data}
+              onRefresh={refreshAll}
+              onDispatch={() => dispatchLogs.refresh()}
+            />
           </div>
         )}
 
@@ -121,6 +132,27 @@ export function App() {
         {page === 'cron' && (
           <div className="animate-fade-in">
             <CronPanel cron={cron.data} />
+          </div>
+        )}
+
+        {/* ── Dispatch Logs ──────────────────────────────────────────────── */}
+        {page === 'dispatch' && (
+          <div className="animate-fade-in">
+            <DispatchLog
+              logs={dispatchLogs.data}
+              onRetry={async (taskId, _agentId) => {
+                await api.retryDispatch(taskId)
+                dispatchLogs.refresh()
+                tasks.refresh()
+              }}
+            />
+          </div>
+        )}
+
+        {/* ── Event Stream ───────────────────────────────────────────────── */}
+        {page === 'events' && (
+          <div className="animate-fade-in">
+            <EventStream />
           </div>
         )}
       </main>

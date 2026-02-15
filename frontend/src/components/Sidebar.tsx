@@ -6,17 +6,19 @@ import {
   KanbanSquare,
   Activity,
   Radio,
-  Settings,
-  Cog,
+  Send,
+  Terminal,
 } from 'lucide-react'
 
-export type Page = 'dashboard' | 'agents' | 'tasks' | 'activity' | 'cron'
+export type Page = 'dashboard' | 'agents' | 'tasks' | 'activity' | 'cron' | 'dispatch' | 'events'
 
 const NAV: { id: Page; label: string; icon: React.ReactNode }[] = [
   { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard size={18} /> },
   { id: 'agents', label: 'Agents', icon: <Users size={18} /> },
   { id: 'tasks', label: 'Tasks', icon: <KanbanSquare size={18} /> },
+  { id: 'dispatch', label: 'Dispatch', icon: <Send size={18} /> },
   { id: 'activity', label: 'Activity', icon: <Activity size={18} /> },
+  { id: 'events', label: 'Event Stream', icon: <Terminal size={18} /> },
   { id: 'cron', label: 'Heartbeats', icon: <Radio size={18} /> },
 ]
 

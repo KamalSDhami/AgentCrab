@@ -36,6 +36,14 @@ export interface Task {
   deadline?: string | null
   createdAtMs?: number
   updatedAtMs?: number
+  dispatch?: {
+    lastDispatchAtMs?: number
+    lastDispatchStatus?: string
+    dispatchCount?: number
+    lastAgentId?: string
+    lastError?: string | null
+    history?: DispatchRecord[]
+  }
 }
 
 export interface ActivityEvent {
@@ -76,6 +84,32 @@ export interface CronList {
   error?: string
 }
 
+export interface DispatchRecord {
+  id: string
+  taskId: string
+  agentId: string
+  status: string
+  message: string
+  response?: string
+  error?: string | null
+  attempt: number
+  createdAtMs: number
+  dispatchedAtMs?: number | null
+  completedAtMs?: number | null
+}
+
+export interface DispatchResult {
+  ok: boolean
+  dispatched: number
+  records: DispatchRecord[]
+}
+
+export interface GatewayHealth {
+  ok: boolean
+  gateway?: any
+  error?: string
+}
+
 /* ── API Client ────────────────────────────────────────────────────────────── */
 
 const BASE = ''  // Same origin in production; Vite proxy in dev
@@ -113,4 +147,35 @@ export const api = {
   cron: () => request<CronList>('/api/cron'),
   messages: (taskId?: string) =>
     request<any[]>(`/api/messages${taskId ? `?task_id=${taskId}` : ''}`),
+
+  // Dispatch
+  dispatchTask: (taskId: string, agentId?: string) =>
+    request<DispatchResult>(`/api/dispatch/${encodeURIComponent(taskId)}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(agentId ? { agent_id: agentId } : {}),
+    }),
+  retryDispatch: (taskId: string, agentId?: string) =>
+    request<DispatchResult>(`/api/dispatch/${encodeURIComponent(taskId)}/retry`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(agentId ? { agent_id: agentId } : {}),
+    }),
+  dispatchLogs: (limit = 100) =>
+    request<DispatchRecord[]>(`/api/dispatch/logs?limit=${limit}`),
+  dispatchLogsForTask: (taskId: string) =>
+    request<DispatchRecord[]>(`/api/dispatch/logs/${encodeURIComponent(taskId)}`),
+
+  // Agent control
+  sendAgentMessage: (agentId: string, message: string) =>
+    request<any>(`/api/agents/${encodeURIComponent(agentId)}/message`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message }),
+    }),
+  wakeAgent: (agentId: string) =>
+    request<any>(`/api/agents/${encodeURIComponent(agentId)}/wake`, { method: 'POST' }),
+
+  // Gateway
+  gatewayHealth: () => request<GatewayHealth>('/api/gateway/health'),
 }

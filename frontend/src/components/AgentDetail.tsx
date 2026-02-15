@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { AgentDetail as AgentDetailType, api } from '../api'
 import { timeAgo, fmtTime } from '../hooks'
-import { X, FileText, Brain, Heart, Clock } from 'lucide-react'
+import { X, FileText, Brain, Heart, Clock, Send, Zap, MessageSquare } from 'lucide-react'
 
 interface Props {
   agentId: string
@@ -12,10 +12,43 @@ export function AgentDetail({ agentId, onClose }: Props) {
   const [detail, setDetail] = useState<AgentDetailType | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<'soul' | 'memory' | 'heartbeat' | 'agents'>('soul')
+  const [message, setMessage] = useState('')
+  const [sending, setSending] = useState(false)
+  const [waking, setWaking] = useState(false)
+  const [actionMsg, setActionMsg] = useState<string | null>(null)
 
   useEffect(() => {
     api.agentDetail(agentId).then(setDetail).catch((e) => setError(e.message))
   }, [agentId])
+
+  async function handleWake() {
+    setWaking(true)
+    setActionMsg(null)
+    try {
+      await api.wakeAgent(agentId)
+      setActionMsg('Agent wake signal sent')
+    } catch (e: any) {
+      setActionMsg(`Wake failed: ${e.message}`)
+    } finally {
+      setWaking(false)
+    }
+  }
+
+  async function handleSendMessage(e: React.FormEvent) {
+    e.preventDefault()
+    if (!message.trim()) return
+    setSending(true)
+    setActionMsg(null)
+    try {
+      await api.sendAgentMessage(agentId, message.trim())
+      setActionMsg('Message sent to agent')
+      setMessage('')
+    } catch (err: any) {
+      setActionMsg(`Send failed: ${err.message}`)
+    } finally {
+      setSending(false)
+    }
+  }
 
   const tabs = [
     { id: 'soul' as const, label: 'SOUL', icon: <Brain size={14} /> },
@@ -85,6 +118,45 @@ export function AgentDetail({ agentId, onClose }: Props) {
               <div className="text-lg font-bold text-slate-100">{detail.derivedStatus}</div>
               <div className="text-xs text-slate-500">Status</div>
             </div>
+          </div>
+        )}
+
+        {/* Agent controls */}
+        {detail && (
+          <div className="px-6 pb-3 space-y-2">
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleWake}
+                disabled={waking}
+                className="btn-ghost flex items-center gap-1.5 text-xs border border-amber-500/20 text-amber-400 hover:bg-amber-500/10"
+              >
+                <Zap size={12} /> {waking ? 'Waking…' : 'Wake Agent'}
+              </button>
+            </div>
+            <form onSubmit={handleSendMessage} className="flex gap-2">
+              <input
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
+                placeholder="Send a message to this agent…"
+                className="input-field flex-1 text-xs"
+              />
+              <button
+                type="submit"
+                disabled={sending || !message.trim()}
+                className="btn-primary text-xs px-3 disabled:opacity-40 flex items-center gap-1"
+              >
+                <Send size={12} /> {sending ? 'Sending…' : 'Send'}
+              </button>
+            </form>
+            {actionMsg && (
+              <div className={`text-xs px-2 py-1 rounded ${
+                actionMsg.includes('failed') || actionMsg.includes('Failed')
+                  ? 'text-rose-400 bg-rose-500/10'
+                  : 'text-emerald-400 bg-emerald-500/10'
+              }`}>
+                {actionMsg}
+              </div>
+            )}
           </div>
         )}
 

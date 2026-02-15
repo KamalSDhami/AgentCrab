@@ -18,15 +18,34 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from .config import settings, log
-from .routers import health, agents, tasks, activity, cron, streams, overview
+from .routers import health, agents, tasks, activity, cron, streams, overview, dispatch
 
 
 # ── Lifespan ─────────────────────────────────────────────────────────────────
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
+    import asyncio
     log.info("AgentCrab starting — mc_root=%s", settings.mc_root)
+
+    # Start orchestrator background loop
+    orchestrator_task = None
+    if settings.orchestrator_enabled and settings.gateway_token:
+        from .services.dispatcher import orchestrator_loop
+        orchestrator_task = asyncio.create_task(orchestrator_loop())
+        log.info("Orchestrator loop started")
+    else:
+        log.info("Orchestrator disabled (no gateway_token or orchestrator_enabled=false)")
+
     yield
+
+    # Shutdown orchestrator
+    if orchestrator_task:
+        orchestrator_task.cancel()
+        try:
+            await orchestrator_task
+        except asyncio.CancelledError:
+            pass
     log.info("AgentCrab shutting down")
 
 
@@ -75,6 +94,7 @@ app.include_router(agents.router, prefix="/api")
 app.include_router(tasks.router, prefix="/api")
 app.include_router(activity.router, prefix="/api")
 app.include_router(cron.router, prefix="/api")
+app.include_router(dispatch.router, prefix="/api")
 app.include_router(streams.router, prefix="/api")
 
 

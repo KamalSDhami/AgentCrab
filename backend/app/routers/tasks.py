@@ -67,6 +67,20 @@ def _emit(event_type: str, data: dict[str, Any]) -> None:
         pass  # no event loop (e.g. during tests)
 
 
+async def _auto_dispatch(task: dict[str, Any]) -> None:
+    """Auto-dispatch task to assigned agents if enabled."""
+    if not settings.auto_dispatch or not settings.gateway_token:
+        return
+    assignees = task.get("assigneeIds") or []
+    if not assignees:
+        return
+    try:
+        from ..services.dispatcher import dispatch_task
+        await dispatch_task(task)
+    except Exception as e:
+        log.error("auto_dispatch failed task=%s: %s", task.get("id"), e)
+
+
 # ── Routes ───────────────────────────────────────────────────────────────────
 
 @router.get("")
@@ -75,7 +89,7 @@ def list_tasks() -> list[dict[str, Any]]:
 
 
 @router.post("", status_code=201)
-def create_task(payload: TaskCreate) -> dict[str, Any]:
+async def create_task(payload: TaskCreate) -> dict[str, Any]:
     tasks = read_table(settings.mc_root, "tasks.json")
     task: dict[str, Any] = {
         "id": _make_id(),
@@ -97,16 +111,21 @@ def create_task(payload: TaskCreate) -> dict[str, Any]:
         "taskId": task["id"],
     })
     _emit("task.created", task)
+
+    # Auto-dispatch to assigned agents
+    await _auto_dispatch(task)
+
     return task
 
 
 @router.patch("/{task_id}")
-def update_task(task_id: str, payload: TaskPatch) -> dict[str, Any]:
+async def update_task(task_id: str, payload: TaskPatch) -> dict[str, Any]:
     tasks = read_table(settings.mc_root, "tasks.json")
     for t in tasks:
         if t.get("id") == task_id:
             changes = payload.model_dump(exclude_unset=True)
             old_status = t.get("status")
+            old_assignees = set(t.get("assigneeIds") or [])
             for k, v in changes.items():
                 t[k] = v
             t["updatedAtMs"] = _now_ms()
@@ -127,6 +146,12 @@ def update_task(task_id: str, payload: TaskPatch) -> dict[str, Any]:
             })
             _emit("task.updated", t)
             log.info("Task updated: %s — %s", task_id, msg_parts)
+
+            # Auto-dispatch if new agents were assigned
+            new_assignees = set(t.get("assigneeIds") or [])
+            if "assigneeIds" in changes and new_assignees - old_assignees:
+                await _auto_dispatch(t)
+
             return t
 
     raise HTTPException(status_code=404, detail="Task not found")

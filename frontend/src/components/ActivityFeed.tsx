@@ -7,6 +7,10 @@ import {
   MessageSquare,
   Trash2,
   Activity,
+  Send,
+  CheckCircle2,
+  XCircle,
+  Clock,
 } from 'lucide-react'
 
 const EVENT_ICONS: Record<string, React.ReactNode> = {
@@ -14,6 +18,10 @@ const EVENT_ICONS: Record<string, React.ReactNode> = {
   'task.updated': <RefreshCw size={14} className="text-blue-400" />,
   'task.deleted': <Trash2 size={14} className="text-rose-400" />,
   'message.sent': <MessageSquare size={14} className="text-indigo-400" />,
+  'dispatch.started': <Send size={14} className="text-amber-400" />,
+  'dispatch.completed': <CheckCircle2 size={14} className="text-emerald-400" />,
+  'dispatch.failed': <XCircle size={14} className="text-rose-400" />,
+  'dispatch.timeout': <Clock size={14} className="text-orange-400" />,
 }
 
 interface Props {

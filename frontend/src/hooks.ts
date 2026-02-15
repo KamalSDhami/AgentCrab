@@ -61,6 +61,23 @@ export function useSSE(onEvent: (type: string, data: any) => void) {
         callbackRef.current('task.deleted', JSON.parse(e.data))
       })
 
+      // Dispatch events
+      es.addEventListener('dispatch.started', (e) => {
+        callbackRef.current('dispatch.started', JSON.parse(e.data))
+      })
+      es.addEventListener('dispatch.completed', (e) => {
+        callbackRef.current('dispatch.completed', JSON.parse(e.data))
+      })
+      es.addEventListener('dispatch.failed', (e) => {
+        callbackRef.current('dispatch.failed', JSON.parse(e.data))
+      })
+      es.addEventListener('dispatch.timeout', (e) => {
+        callbackRef.current('dispatch.timeout', JSON.parse(e.data))
+      })
+      es.addEventListener('message.sent', (e) => {
+        callbackRef.current('message.sent', JSON.parse(e.data))
+      })
+
       es.onerror = () => {
         es?.close()
         retryTimeout = setTimeout(connect, 5000)
