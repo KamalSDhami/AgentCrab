@@ -111,35 +111,32 @@ def get_dispatch_for_task(task_id: str) -> list[dict[str, Any]]:
 
 
 def build_task_message(task: dict[str, Any], agent_id: str) -> str:
-    """Construct a structured task dispatch message for an agent."""
+    """Construct a structured task dispatch message for an agent.
+
+    This message is sent via chat.send to the agent's heartbeat session.
+    Keep it concise — the agent already has a HEARTBEAT.md that tells it
+    to check mission_control/tasks.json for full details.
+    """
     title = task.get("title", "Untitled Task")
     task_id = task.get("id", "unknown")
     priority = task.get("priority", "normal")
-    status = task.get("status", "inbox")
     description = task.get("description") or "No description provided."
 
-    return f"""📋 TASK ASSIGNED — {title}
+    return f"""📋 NEW TASK ASSIGNED — {title}
 
 Task ID: {task_id}
 Priority: {priority.upper() if priority else 'NORMAL'}
-Status: {status}
 Assigned To: {agent_id}
-
----
 
 {description}
 
----
-
-INSTRUCTIONS:
-1. Read this task carefully.
-2. Update your WORKING.md with your execution plan.
-3. Execute the task using your available tools.
-4. When complete, update WORKING.md with the results.
-5. If you encounter errors, document them in WORKING.md.
-
-This task was dispatched by AgentCrab Mission Control.
-Respond with your plan and begin execution."""
+ACTION REQUIRED:
+1. Check mission_control/tasks.json — find task {task_id}.
+2. Check mission_control/notifications.json — mark your notification delivered=true.
+3. Update memory/WORKING.md with your execution plan.
+4. Execute the task.
+5. When done, update the task status in mission_control/tasks.json to "done".
+6. Post a summary to mission_control/activities.json."""
 
 
 # ── Core dispatch logic ─────────────────────────────────────────────────────
@@ -165,8 +162,13 @@ async def dispatch_task_to_agent(
 ) -> DispatchRecord:
     """Dispatch a task to an agent via the OpenClaw gateway.
 
-    Primary: WebSocket RPC chat.send (non-blocking)
-    Fallback: OpenClaw CLI subprocess (if gateway fails)
+    Strategy (3-pronged):
+      1. Write a notification to mission_control/notifications.json
+         so the agent sees it on its next heartbeat file scan.
+      2. Send chat.send with deliver=True to the agent's heartbeat
+         session so the message is delivered immediately during the
+         current turn (if the agent is active).
+      3. Fallback to OpenClaw CLI if gateway RPC fails.
     """
     message = build_task_message(task, agent_id)
     record = DispatchRecord(
@@ -186,7 +188,10 @@ async def dispatch_task_to_agent(
     # Emit SSE event
     await _emit_dispatch_event("dispatch.started", record)
 
-    # Try gateway RPC first
+    # Step 1: Write notification to notifications.json (filesystem)
+    _write_notification(task, agent_id)
+
+    # Step 2: Try gateway RPC — deliver=True to heartbeat session
     try:
         record.status = DispatchStatus.DISPATCHING
         GatewayConfig, rpc_send, ensure_session, GatewayError = await _get_gateway()
@@ -196,19 +201,16 @@ async def dispatch_task_to_agent(
             token=settings.gateway_token,
         )
 
-        # Ensure session exists
-        session_key = f"agent:{agent_id}:mc-dispatch"
-        await ensure_session(
-            session_key,
-            config=config,
-            label=f"MC Task: {task.get('title', '')[:50]}",
-        )
+        # Target the agent's heartbeat cron session — this is the session
+        # that the agent actively reads on each heartbeat tick.
+        session_key = f"agent:{agent_id}:cron:{agent_id}-heartbeat"
 
-        # Send task message
+        # Send task message with deliver=True for immediate processing
         result = await rpc_send(
             message,
             session_key=session_key,
             config=config,
+            deliver=True,
         )
 
         record.status = DispatchStatus.DISPATCHED
@@ -216,9 +218,10 @@ async def dispatch_task_to_agent(
         record.response = str(result)[:1000] if result else "ok"
 
         log.info(
-            "dispatch.success task=%s agent=%s via=gateway_rpc",
+            "dispatch.success task=%s agent=%s via=gateway_rpc session=%s deliver=true",
             record.task_id,
             agent_id,
+            session_key,
         )
 
     except Exception as rpc_err:
@@ -312,6 +315,35 @@ async def _dispatch_via_cli(
         log.info("dispatch.cli_background task=%s agent=%s pid=%s", record.task_id, agent_id, proc.pid)
 
     return record
+
+
+def _write_notification(task: dict[str, Any], agent_id: str) -> None:
+    """Write a notification to mission_control/notifications.json.
+
+    Agents check this file on each heartbeat (per their HEARTBEAT.md).
+    They look for entries matching their agent ID where delivered=false.
+    """
+    try:
+        notifications = read_table(settings.mc_root, "notifications.json")
+        notifications.append({
+            "id": f"notif_{uuid.uuid4().hex[:10]}",
+            "type": "task.assigned",
+            "targetAgentId": agent_id,
+            "taskId": task.get("id", ""),
+            "title": task.get("title", ""),
+            "message": f"You have been assigned task: {task.get('title', '')}. Check mission_control/tasks.json for details.",
+            "priority": task.get("priority", "normal"),
+            "delivered": False,
+            "createdAtMs": int(time.time() * 1000),
+        })
+        # Keep only recent undelivered + last 50 delivered
+        undelivered = [n for n in notifications if not n.get("delivered")]
+        delivered = [n for n in notifications if n.get("delivered")]
+        notifications = undelivered + delivered[-50:]
+        write_table(settings.mc_root, "notifications.json", notifications)
+        log.info("dispatch.notification_written agent=%s task=%s", agent_id, task.get("id"))
+    except Exception as e:
+        log.error("dispatch.notification_write_failed agent=%s error=%s", agent_id, e)
 
 
 def _update_task_dispatch_meta(record: DispatchRecord) -> None:
@@ -436,16 +468,21 @@ async def send_agent_message(
     agent_id: str,
     message: str,
 ) -> dict[str, Any]:
-    """Send a direct message to an agent (not task-related)."""
+    """Send a direct message to an agent via its heartbeat session.
+
+    Uses deliver=True so the agent processes the message immediately.
+    """
     try:
         GatewayConfig, rpc_send, ensure_session, GatewayError = await _get_gateway()
         config = GatewayConfig(
             url=f"ws://127.0.0.1:{settings.gateway_port}",
             token=settings.gateway_token,
         )
-        session_key = f"agent:{agent_id}:mc-direct"
-        await ensure_session(session_key, config=config, label=f"MC Direct - {agent_id}")
-        result = await rpc_send(message, session_key=session_key, config=config)
+        # Use the agent's heartbeat session for immediate delivery
+        session_key = f"agent:{agent_id}:cron:{agent_id}-heartbeat"
+        result = await rpc_send(
+            message, session_key=session_key, config=config, deliver=True
+        )
         log.info("agent.message.sent agent=%s", agent_id)
         return {"ok": True, "result": str(result)[:500]}
     except Exception as e:
