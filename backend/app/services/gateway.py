@@ -118,10 +118,10 @@ def _connect_params(config: GatewayConfig) -> dict[str, Any]:
         "role": "operator",
         "scopes": list(OPERATOR_SCOPES),
         "client": {
-            "id": "agentcrab-mission-control",
-            "version": "2.1.0",
-            "platform": "server",
-            "mode": "api",
+            "id": "gateway-client",
+            "version": "1.0.0",
+            "platform": "web",
+            "mode": "ui",
         },
     }
     if config.token:
