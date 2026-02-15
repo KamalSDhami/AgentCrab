@@ -68,7 +68,7 @@ def get_table(table: str) -> Any:
 def cron_status() -> Any:
     try:
         proc = subprocess.run(
-            [settings.openclaw_bin, "cron", "list", "--json"],
+            [settings.openclaw_bin, "--no-color", "cron", "list", "--json"],
             check=False,
             capture_output=True,
             text=True,
@@ -84,11 +84,27 @@ def cron_status() -> Any:
     if proc.returncode != 0:
         return {"ok": False, "jobs": [], "error": {"exitCode": proc.returncode, "stderr": proc.stderr.strip()}}
 
-    try:
-        payload = json.loads(stdout)
-        if isinstance(payload, dict) and "jobs" in payload:
-            payload.setdefault("ok", True)
-            return payload
-        return {"ok": True, "jobs": payload}
-    except json.JSONDecodeError:
+    def _try_parse_json(maybe: str) -> Any | None:
+        try:
+            return json.loads(maybe)
+        except json.JSONDecodeError:
+            return None
+
+    # OpenClaw may print "Doctor warnings" banners before the JSON.
+    payload = _try_parse_json(stdout)
+    if payload is None:
+        lines = stdout.splitlines()
+        for idx, line in enumerate(lines):
+            if line.lstrip().startswith("{"):
+                candidate = "\n".join(lines[idx:]).strip()
+                payload = _try_parse_json(candidate)
+                if payload is not None:
+                    break
+
+    if payload is None:
         return {"ok": False, "jobs": [], "error": {"error": "invalid json from openclaw", "stdout": stdout[:2000]}}
+
+    if isinstance(payload, dict) and "jobs" in payload:
+        payload.setdefault("ok", True)
+        return payload
+    return {"ok": True, "jobs": payload}
