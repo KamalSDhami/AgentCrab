@@ -5,6 +5,8 @@ import subprocess
 from pathlib import Path
 from typing import Any
 
+import os
+
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -20,11 +22,6 @@ def _mc_path(name: str) -> Path:
 
 app = FastAPI(title="Agent Monitor API", version="0.1.0")
 
-if settings.serve_static:
-    static_path = Path(__file__).resolve().parent / settings.static_dir
-    if static_path.exists():
-        app.mount("/", StaticFiles(directory=str(static_path), html=True), name="static")
-
 origins = [o.strip() for o in settings.cors_origins.split(",") if o.strip()]
 app.add_middleware(
     CORSMiddleware,
@@ -33,6 +30,14 @@ app.add_middleware(
     allow_methods=["GET"],
     allow_headers=["*"]
 )
+
+
+def _static_dist_path() -> Path:
+    configured = Path(settings.static_dir)
+    if configured.is_absolute():
+        return configured
+    # Resolve relative to the process working directory (systemd WorkingDirectory=/opt/AgentCrab/backend)
+    return Path(os.getcwd()) / configured
 
 
 @app.get("/api/health")
@@ -108,3 +113,10 @@ def cron_status() -> Any:
         payload.setdefault("ok", True)
         return payload
     return {"ok": True, "jobs": payload}
+
+
+# Mount static frontend last so /api/* routes still work.
+if settings.serve_static:
+    static_path = _static_dist_path()
+    if static_path.exists():
+        app.mount("/", StaticFiles(directory=str(static_path), html=True), name="static")
