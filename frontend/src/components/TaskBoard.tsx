@@ -35,6 +35,7 @@ function PortalMenu({
   onClose: () => void
 }) {
   const [pos, setPos] = useState({ top: 0, left: 0 })
+  const menuRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     const el = anchorRef.current
@@ -43,10 +44,12 @@ function PortalMenu({
     setPos({ top: rect.bottom + 4, left: Math.min(rect.right - 180, window.innerWidth - 200) })
   }, [anchorRef])
 
-  // Close on outside click
+  // Close on outside click — but NOT when clicking inside the portal menu itself
   useEffect(() => {
     function handler(e: MouseEvent) {
-      if (anchorRef.current?.contains(e.target as Node)) return
+      const target = e.target as Node
+      if (anchorRef.current?.contains(target)) return
+      if (menuRef.current?.contains(target)) return
       onClose()
     }
     document.addEventListener('mousedown', handler)
@@ -55,6 +58,7 @@ function PortalMenu({
 
   return createPortal(
     <div
+      ref={menuRef}
       className="fixed z-[200] glass-panel p-1 min-w-[180px] animate-fade-in rounded-lg shadow-xl shadow-black/40 border border-slate-700/50"
       style={{ top: pos.top, left: pos.left }}
     >

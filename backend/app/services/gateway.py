@@ -228,16 +228,17 @@ async def wake_agent(
     agent_id: str,
     *,
     config: GatewayConfig,
-    mode: str = "heartbeat",
+    mode: str = "now",
     text: str | None = None,
 ) -> Any:
     """Wake an agent via chat.send with deliver=True.
 
-    The raw ``wake`` RPC requires ``mode`` and ``text`` fields and rejects
-    ``agentId``.  The reference Mission Control project never calls the
-    ``wake`` method directly — instead it uses ``chat.send`` with
-    ``deliver=True`` to the agent's heartbeat session.  We follow the
-    same approach for reliability, with a thin ``wake`` RPC fallback.
+    The raw ``wake`` RPC requires ``mode`` ("now" | "next-heartbeat")
+    and ``text`` fields and rejects ``agentId``.  The reference Mission
+    Control project never calls the ``wake`` method directly — instead
+    it uses ``chat.send`` with ``deliver=True`` to the agent's heartbeat
+    session.  We follow the same approach for reliability, with a thin
+    ``wake`` RPC fallback.
     """
     wakeup_text = text or (
         f"Wake up, {agent_id}. "
@@ -251,9 +252,21 @@ async def wake_agent(
         agent_id, session_key, mode,
     )
 
-    # Primary path: ensure session then chat.send with deliver=True
+    # Primary path: ensure session exists, then chat.send with deliver=True
     try:
-        await ensure_session(session_key, config=config, label=agent_id)
+        try:
+            await ensure_session(session_key, config=config, label=agent_id)
+        except GatewayError as session_err:
+            # "label already in use" is expected when session already exists
+            if "label already in use" in str(session_err).lower():
+                log.debug(
+                    "gateway.wake.session_exists agent=%s (label reuse ok)",
+                    agent_id,
+                )
+                # Try without label
+                await ensure_session(session_key, config=config)
+            else:
+                raise
         result = await send_message(
             wakeup_text,
             session_key=session_key,
@@ -269,10 +282,12 @@ async def wake_agent(
         )
 
     # Fallback: try the raw wake RPC with correct schema
+    # Gateway accepts mode: "now" | "next-heartbeat" only
+    wake_mode = mode if mode in ("now", "next-heartbeat") else "now"
     try:
         result = await gateway_call(
             "wake",
-            {"mode": mode, "text": wakeup_text},
+            {"mode": wake_mode, "text": wakeup_text},
             config=config,
         )
         log.info("gateway.wake.ok agent=%s via=wake_rpc", agent_id)

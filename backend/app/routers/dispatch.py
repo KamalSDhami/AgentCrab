@@ -33,7 +33,7 @@ class MessageRequest(BaseModel):
 
 
 class WakeRequest(BaseModel):
-    mode: str = "heartbeat"
+    mode: str = "now"
     text: str | None = None
 
 

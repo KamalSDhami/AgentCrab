@@ -203,6 +203,19 @@ async def dispatch_task_to_agent(
         # that the agent actively reads on each heartbeat tick.
         session_key = f"agent:{agent_id}:cron:{agent_id}-heartbeat"
 
+        # Ensure session exists (handle label-already-in-use gracefully)
+        try:
+            await ensure_session(session_key, config=config, label=agent_id)
+        except GatewayError as session_err:
+            if "label already in use" in str(session_err).lower():
+                log.debug("dispatch.session_exists agent=%s (ok)", agent_id)
+                try:
+                    await ensure_session(session_key, config=config)
+                except GatewayError:
+                    pass  # session likely already exists, proceed
+            else:
+                log.warning("dispatch.ensure_session_failed agent=%s: %s", agent_id, session_err)
+
         # Send task message with deliver=True for immediate processing
         result = await rpc_send(
             message,
